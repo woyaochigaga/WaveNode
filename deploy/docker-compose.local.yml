@@ -208,8 +208,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        
       redis:
         condition: service_healthy
+        
     networks:
       - sub2api-network
     healthcheck:
@@ -224,6 +226,8 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:18-alpine
+    ports:
+          - "127.0.0.1:5432:5432"
     container_name: sub2api-postgres
     restart: unless-stopped
     ulimits:
@@ -255,6 +259,8 @@ services:
   # ===========================================================================
   redis:
     image: redis:8-alpine
+    ports:
+          - "127.0.0.1:6379:6379"
     container_name: sub2api-redis
     restart: unless-stopped
     ulimits:
