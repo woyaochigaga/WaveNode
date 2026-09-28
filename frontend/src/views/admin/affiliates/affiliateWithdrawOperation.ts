@@ -46,7 +46,7 @@ function storeKey(storageKey: string, key: string | null) {
 export function prepareAffiliateWithdrawOperation(userId: number, amount: number): AffiliateWithdrawOperation {
   const normalizedAmount = Math.round(amount * LEDGER_SCALE) / LEDGER_SCALE
   const adminId = currentAdminId()
-  const storageKey = adminId ? `sub2api:admin:affiliate-withdraw:${adminId}:${userId}:${normalizedAmount}` : null
+  const storageKey = adminId ? `wavenode:admin:affiliate-withdraw:${adminId}:${userId}:${normalizedAmount}` : null
   let key = storageKey ? pendingKeys.get(storageKey) ?? readStoredKey(storageKey) : null
   const outcomeUncertain = !!key
   if (!key) {

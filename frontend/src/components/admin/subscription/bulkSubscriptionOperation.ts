@@ -50,7 +50,7 @@ export function prepareBulkSubscriptionOperation(input: SubscriptionBulkActionRe
     request.monthly = !!input.monthly
   }
   const adminId = currentAdminId()
-  const storageKey = adminId ? `sub2api:admin:subscription-bulk:${adminId}:${JSON.stringify(request)}` : null
+  const storageKey = adminId ? `wavenode:admin:subscription-bulk:${adminId}:${JSON.stringify(request)}` : null
   let key = storageKey ? pendingKeys.get(storageKey) ?? readStoredKey(storageKey) : null
   const outcomeUncertain = !!key
   if (!key) {
