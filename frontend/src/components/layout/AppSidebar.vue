@@ -37,9 +37,26 @@
     <nav ref="sidebarNavRef" class="sidebar-nav scrollbar-hide">
       <!-- Admin View: Admin menu first, then personal menu -->
       <template v-if="isAdmin">
-        <!-- Admin Section -->
-        <div class="sidebar-section">
-          <template v-for="item in adminNavItems" :key="item.path">
+        <!-- 管理菜单按任务分区，避免不同职责的入口混在同一层级。 -->
+        <div
+          v-for="section in adminNavSections"
+          :key="section.key"
+          class="sidebar-section sidebar-admin-section"
+        >
+          <div
+            class="sidebar-section-title"
+            :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }"
+            :aria-hidden="sidebarCollapsed ? 'true' : 'false'"
+          >
+            <span
+              class="sidebar-section-title-text"
+              :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }"
+            >
+              {{ section.label }}
+            </span>
+          </div>
+
+          <template v-for="item in section.items" :key="item.path">
             <!-- Collapsible group (has children) -->
             <template v-if="item.children?.length">
               <button
@@ -223,6 +240,12 @@ interface NavItem {
    * 开关切换时菜单自动更新。
    */
   featureFlag?: () => boolean | undefined
+}
+
+interface AdminNavSection {
+  key: string
+  label: string
+  items: NavItem[]
 }
 
 // applyFeatureFlags 递归过滤掉 featureFlag() === false 的节点（含子节点）。
@@ -776,91 +799,131 @@ const customMenuItemsForAdmin = computed(() => {
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
-// Admin navigation items
-const adminNavItems = computed((): NavItem[] => {
-  const baseItems: NavItem[] = [
-    { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-    { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
-    { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
-    { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
+// 管理菜单按用户任务分区；分区仅负责视觉层级，原有路由、权限和功能开关保持不变。
+const adminNavSections = computed((): AdminNavSection[] => {
+  const sections: AdminNavSection[] = [
     {
-      path: '/admin/channels',
-      label: t('nav.channelManagement'),
-      icon: ChannelIcon,
-      hideInSimpleMode: true,
-      expandOnly: true,
-      children: [
-        { path: '/admin/channels/pricing', label: t('nav.channelPricing'), icon: PriceTagIcon },
-        { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor },
-      ],
-    },
-    // 「仅充值」站点连管理端的「订阅管理」入口也一并收起（路由本身不拦截）。
-    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
-    { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
-    { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement },
-    { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
-    { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
-    {
-      path: '/admin/security-audit',
-      label: t('nav.securityAudit'),
-      icon: ShieldIcon,
-      expandOnly: true,
-      featureFlag: flagRiskControl,
-      children: [
-        { path: '/admin/risk-control', label: t('nav.contentModeration'), icon: ShieldIcon },
-        { path: '/admin/prompt-audit', label: t('nav.promptAudit'), icon: ShieldIcon },
-      ],
-    },
-    { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
-    { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
-    {
-      path: '/admin/affiliates',
-      label: t('nav.affiliateManagement'),
-      icon: UsersIcon,
-      hideInSimpleMode: true,
-      expandOnly: true,
-      featureFlag: flagAffiliate,
-      children: [
-        { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon },
-        { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon },
-        { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon },
-      ],
+      key: 'overview',
+      label: t('nav.adminSections.overview'),
+      items: [
+        { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
+        { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring }
+      ]
     },
     {
-      path: '/admin/orders',
-      label: t('nav.orderManagement'),
-      icon: OrderIcon,
-      hideInSimpleMode: true,
-      expandOnly: true,
-      featureFlag: flagAdminPayment,
-      children: [
-        { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
-        { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
-        { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
-      ],
+      key: 'business',
+      label: t('nav.adminSections.business'),
+      items: [
+        { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
+        // 「仅充值」站点连管理端的「订阅管理」入口也一并收起（路由本身不拦截）。
+        { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, featureFlag: flagSubscription },
+        { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon }
+      ]
     },
-    { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
-    { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
+    {
+      key: 'resources',
+      label: t('nav.adminSections.resources'),
+      items: [
+        { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
+        { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+        { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
+        {
+          path: '/admin/channels',
+          label: t('nav.channelManagement'),
+          icon: ChannelIcon,
+          hideInSimpleMode: true,
+          expandOnly: true,
+          children: [
+            { path: '/admin/channels/pricing', label: t('nav.channelPricing'), icon: PriceTagIcon },
+            { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor }
+          ]
+        }
+      ]
+    },
+    {
+      key: 'security',
+      label: t('nav.adminSections.security'),
+      items: [
+        {
+          path: '/admin/security-audit',
+          label: t('nav.securityAudit'),
+          icon: ShieldIcon,
+          expandOnly: true,
+          featureFlag: flagRiskControl,
+          children: [
+            { path: '/admin/risk-control', label: t('nav.contentModeration'), icon: ShieldIcon },
+            { path: '/admin/prompt-audit', label: t('nav.promptAudit'), icon: ShieldIcon }
+          ]
+        },
+        { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
+        { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
+      ]
+    },
+    {
+      key: 'growth',
+      label: t('nav.adminSections.growth'),
+      items: [
+        { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
+        { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
+        {
+          path: '/admin/affiliates',
+          label: t('nav.affiliateManagement'),
+          icon: UsersIcon,
+          hideInSimpleMode: true,
+          expandOnly: true,
+          featureFlag: flagAffiliate,
+          children: [
+            { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon },
+            { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon },
+            { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon }
+          ]
+        },
+        {
+          path: '/admin/orders',
+          label: t('nav.orderManagement'),
+          icon: OrderIcon,
+          hideInSimpleMode: true,
+          expandOnly: true,
+          featureFlag: flagAdminPayment,
+          children: [
+            { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
+            { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
+            { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon }
+          ]
+        }
+      ]
+    },
+    {
+      key: 'system',
+      label: t('nav.adminSections.system'),
+      items: [
+        { path: '/admin/plugins', label: t('nav.plugins'), icon: PluginIcon, featureFlag: flagPluginManagement }
+      ]
+    }
   ]
 
-  const visible = applyFeatureFlags(baseItems)
-
-  // 简单模式下，在系统设置前插入 API密钥
+  const systemSection = sections.find((section) => section.key === 'system')!
   if (authStore.isSimpleMode) {
-    const filtered = visible.filter(item => !item.hideInSimpleMode)
-    filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
-    filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
-    for (const cm of customMenuItemsForAdmin.value) {
-      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
-    }
-    return filtered
+    systemSection.items.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
   }
+  systemSection.items.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
+  systemSection.items.push(
+    ...customMenuItemsForAdmin.value.map((item): NavItem => ({
+      path: `/custom/${item.id}`,
+      label: item.label,
+      icon: null,
+      iconSvg: item.icon_svg
+    }))
+  )
 
-  visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
-  for (const cm of customMenuItemsForAdmin.value) {
-    visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
-  }
-  return visible
+  return sections
+    .map((section) => ({
+      ...section,
+      items: applyFeatureFlags(section.items).filter(
+        (item) => !authStore.isSimpleMode || !item.hideInSimpleMode
+      )
+    }))
+    .filter((section) => section.items.length > 0)
 })
 
 function toggleSidebar() {
@@ -1055,6 +1118,14 @@ onBeforeUnmount(() => {
   gap: 0;
   padding-left: 0.875rem;
   padding-right: 0.875rem;
+}
+
+.sidebar-admin-section {
+  margin-bottom: 0.875rem;
+}
+
+.sidebar-admin-section:last-child {
+  margin-bottom: 1.25rem;
 }
 
 .sidebar-section-title {

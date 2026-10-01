@@ -114,6 +114,39 @@ describe('ConnectionTestModal', () => {
     )
   })
 
+  it('reloads models and continues testing after the initial model request fails', async () => {
+    getGroupTestModels
+      .mockRejectedValueOnce({ status: 404, message: 'Request failed with status code 404' })
+      .mockResolvedValueOnce(['claude-haiku-4-5'])
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"type":"test_complete","success":true}\n\n'))
+        controller.close()
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })))
+    const wrapper = mountModal()
+
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('common.connectionTest.endpointUnavailable')
+    const retryButton = wrapper.findAll('button').find((button) =>
+      button.text().includes('common.connectionTest.retry')
+    )
+    expect(retryButton?.attributes('disabled')).toBeUndefined()
+    await retryButton!.trigger('click')
+    await flushPromises()
+
+    expect(getGroupTestModels).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/admin/groups/12/test'),
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(wrapper.text()).toContain('common.connectionTest.success')
+  })
+
   it('shows a localized API key preflight error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       code: 400,

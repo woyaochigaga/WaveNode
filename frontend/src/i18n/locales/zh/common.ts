@@ -96,6 +96,7 @@ export default {
       response: '响应：',
       success: '连接测试通过',
       failed: '连接测试失败',
+      endpointUnavailable: '当前后端尚未加载连接测试接口，请重启后端服务后重试。',
       requestFailed: '请求失败（HTTP {status}）',
       noResponse: '服务端没有返回可读取的响应',
       invalidResponse: '收到一条无法解析的测试响应',
@@ -216,7 +217,7 @@ export default {
     availableChannels: '可用渠道',
     modelPlaza: '模型广场',
     subscriptions: '订阅管理',
-    accounts: '账号管理',
+    accounts: '号池管理',
     plugins: '插件管理',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
@@ -249,6 +250,14 @@ export default {
     contentModeration: '内容审计',
     promptAudit: '提示词审计',
     auditLogs: '操作日志',
+    adminSections: {
+      overview: '总览',
+      business: '用户与业务',
+      resources: '资源与渠道',
+      security: '安全与数据',
+      growth: '运营增长',
+      system: '系统扩展'
+    }
   },
 
   // Auth

@@ -108,7 +108,7 @@
           type="button"
           class="btn btn-primary inline-flex items-center gap-2"
           :disabled="!canStart"
-          @click="startTest"
+          @click="handlePrimaryAction"
         >
           <Icon
             :name="status === 'idle' ? 'play' : 'refresh'"
@@ -183,7 +183,10 @@ const modelPlaceholder = computed(() =>
     : t('common.connectionTest.modelPlaceholder')
 )
 const canStart = computed(
-  () => Boolean(props.targetId && selectedModel.value) && status.value !== 'connecting'
+  () => Boolean(props.targetId)
+    && !loadingModels.value
+    && status.value !== 'connecting'
+    && (Boolean(selectedModel.value) || status.value === 'error')
 )
 const actionLabel = computed(() => {
   if (status.value === 'connecting') return t('common.connectionTest.testing')
@@ -253,7 +256,12 @@ const setError = (message: string) => {
 
 const readErrorMessage = (error: unknown): string => {
   if (typeof error === 'object' && error && 'message' in error) {
-    return String((error as { message?: unknown }).message || t('common.unknownError'))
+    const requestError = error as { message?: unknown; status?: unknown }
+    const message = String(requestError.message || t('common.unknownError'))
+    if (requestError.status === 404 && /^Request failed with status code 404$/i.test(message)) {
+      return t('common.connectionTest.endpointUnavailable')
+    }
+    return message
   }
   return error instanceof Error ? error.message : t('common.unknownError')
 }
@@ -317,7 +325,7 @@ const handleEvent = (event: TestEvent) => {
 
 // EventSource 仅支持 GET，因此这里手动解析 POST 返回的 SSE 数据流。
 const startTest = async () => {
-  if (!canStart.value || !props.targetId) return
+  if (!props.targetId || !selectedModel.value || status.value === 'connecting') return
   resetOutput()
   status.value = 'connecting'
   addLine(t('common.connectionTest.starting', { name: props.targetName }), 'text-blue-300')
@@ -380,6 +388,16 @@ const startTest = async () => {
   } finally {
     abortController = null
   }
+}
+
+// 模型列表加载失败时，主按钮会先重新取模型；恢复后直接继续测试，无需关闭弹窗重开。
+const handlePrimaryAction = async () => {
+  if (!selectedModel.value) {
+    resetOutput()
+    await loadModels()
+    if (!selectedModel.value) return
+  }
+  await startTest()
 }
 
 const copyOutput = () => {

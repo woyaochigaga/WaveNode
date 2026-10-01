@@ -96,6 +96,7 @@ export default {
       response: 'Response:',
       success: 'Connection test passed',
       failed: 'Connection test failed',
+      endpointUnavailable: 'The backend has not loaded the connection-test endpoint. Restart it and try again.',
       requestFailed: 'Request failed (HTTP {status})',
       noResponse: 'The server returned no readable response body',
       invalidResponse: 'Received an unreadable test event',
@@ -249,6 +250,14 @@ export default {
     contentModeration: 'Content Moderation',
     promptAudit: 'Prompt Audit',
     auditLogs: 'Audit Logs',
+    adminSections: {
+      overview: 'Overview',
+      business: 'Users & Business',
+      resources: 'Resources & Channels',
+      security: 'Security & Data',
+      growth: 'Operations & Growth',
+      system: 'System & Extensions'
+    }
   },
 
   // Auth
