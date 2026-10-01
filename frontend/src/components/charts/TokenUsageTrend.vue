@@ -1,25 +1,31 @@
 <template>
-  <div class="card p-4">
-    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-      {{ t('admin.dashboard.tokenUsageTrend') }}
-    </h3>
-    <div v-if="loading" class="flex h-48 items-center justify-center">
+  <article class="trend-panel">
+    <div class="mb-5 flex items-start justify-between gap-3">
+      <div>
+        <h3>{{ t('dashboard.tokenUsageTrend') }}</h3>
+        <p>{{ t('dashboard.tokenUsageTrendDesc') }}</p>
+      </div>
+      <span class="trend-count">{{ t('dashboard.dataPoints', { count: trendData.length }) }}</span>
+    </div>
+    <div v-if="loading" class="flex h-64 items-center justify-center">
       <LoadingSpinner />
     </div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-48">
+    <div v-else-if="trendData.length > 0 && chartData" class="h-64">
       <Line :data="chartData" :options="lineOptions" />
     </div>
     <div
       v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      class="flex h-64 flex-col items-center justify-center text-center"
     >
-      {{ t('admin.dashboard.noDataAvailable') }}
+      <span class="trend-empty"><Icon name="chart" size="lg" /></span>
+      <p class="mt-3 text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('dashboard.noDataAvailable') }}</p>
+      <p class="mt-1 text-xs text-gray-500 dark:text-dark-300">{{ t('dashboard.noChartDataHint') }}</p>
     </div>
-  </div>
+  </article>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -34,6 +40,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import Icon from '@/components/icons/Icon.vue'
 import type { TrendDataPoint } from '@/types'
 
 ChartJS.register(
@@ -54,18 +61,29 @@ const props = defineProps<{
   loading?: boolean
 }>()
 
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
+const isDarkMode = ref(document.documentElement.classList.contains('dark'))
+let themeObserver: MutationObserver | null = null
+
+// Chart.js 不会自动响应根节点 class 变化，这里同步主题状态以实时更新坐标与网格颜色。
+onMounted(() => {
+  themeObserver = new MutationObserver(() => {
+    isDarkMode.value = document.documentElement.classList.contains('dark')
+  })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+})
+
+onBeforeUnmount(() => {
+  themeObserver?.disconnect()
 })
 
 const chartColors = computed(() => ({
   text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
-  input: '#3b82f6',
-  output: '#10b981',
-  cacheCreation: '#f59e0b',
-  cacheRead: '#06b6d4',
-  cacheHitRate: '#8b5cf6'
+  grid: isDarkMode.value ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.22)',
+  input: '#2563eb',
+  output: '#0f766e',
+  cacheCreation: '#d97706',
+  cacheRead: '#0891b2',
+  cacheHitRate: '#7c3aed'
 }))
 
 const chartData = computed(() => {
@@ -80,7 +98,10 @@ const chartData = computed(() => {
         borderColor: chartColors.value.input,
         backgroundColor: `${chartColors.value.input}20`,
         fill: true,
-        tension: 0.3
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
       },
       {
         label: 'Output',
@@ -88,7 +109,10 @@ const chartData = computed(() => {
         borderColor: chartColors.value.output,
         backgroundColor: `${chartColors.value.output}20`,
         fill: true,
-        tension: 0.3
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
       },
       {
         label: 'Cache Creation',
@@ -96,7 +120,10 @@ const chartData = computed(() => {
         borderColor: chartColors.value.cacheCreation,
         backgroundColor: `${chartColors.value.cacheCreation}20`,
         fill: true,
-        tension: 0.3
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 1.5,
       },
       {
         label: 'Cache Read',
@@ -104,7 +131,10 @@ const chartData = computed(() => {
         borderColor: chartColors.value.cacheRead,
         backgroundColor: `${chartColors.value.cacheRead}20`,
         fill: true,
-        tension: 0.3
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 1.5,
       },
       {
         label: 'Cache Hit Rate',
@@ -116,7 +146,10 @@ const chartData = computed(() => {
         backgroundColor: `${chartColors.value.cacheHitRate}20`,
         borderDash: [5, 5],
         fill: false,
-        tension: 0.3,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 1.5,
         yAxisID: 'yPercent'
       }
     ]
@@ -226,3 +259,67 @@ const formatCost = (value: number): string => {
   return value.toFixed(4)
 }
 </script>
+
+<style scoped>
+.trend-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 1.1rem;
+}
+
+.trend-panel h3 {
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.trend-panel h3 + p {
+  margin-top: 0.25rem;
+  color: #64748b;
+  font-size: 0.7rem;
+}
+
+.trend-count {
+  flex-shrink: 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+  padding: 0.28rem 0.6rem;
+  color: #64748b;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.trend-empty {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+
+:global(.dark .trend-panel) {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(4, 8, 17, 0.78);
+}
+
+:global(.dark .trend-panel h3) { color: #f8fafc; }
+:global(.dark .trend-panel h3 + p) { color: #94a3b8; }
+
+:global(.dark .trend-count) {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.82);
+  color: #94a3b8;
+}
+
+:global(.dark .trend-empty) {
+  background: rgba(37, 99, 235, 0.12);
+  color: #93c5fd;
+}
+</style>

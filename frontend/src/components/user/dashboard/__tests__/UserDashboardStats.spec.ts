@@ -124,6 +124,17 @@ describe('UserDashboardStats 按平台拆分', () => {
     expect(w.text()).toContain('dashboard.platformCount:{"count":1}')
   })
 
+  it('按最高窗口用量展示配额预警状态和百分比', () => {
+    const w = mountStats(
+      makeStats({ total_actual_cost: 8, today_actual_cost: 1, by_platform: [usage('openai', 8)] }),
+      [quota({ platform: 'openai', daily_limit_usd: 10, daily_usage_usd: 8 })]
+    )
+
+    expect(w.find('.quota-state--warning').exists()).toBe(true)
+    expect(w.text()).toContain('dashboard.quotaState.warning')
+    expect(w.text()).toContain('80%')
+  })
+
   it('固定顺序之外的平台也产生卡片，并排在固定顺序之后', () => {
     const w = mountStats(
       makeStats({ total_actual_cost: 0.5, today_actual_cost: 0, by_platform: [usage('kimi', 0.3), usage('anthropic', 0.2)] })

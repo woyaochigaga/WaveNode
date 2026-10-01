@@ -1,70 +1,32 @@
 <template>
-  <div class="card">
-    <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('dashboard.quickActions') }}</h2>
+  <section class="quick-panel" aria-labelledby="quick-actions-title">
+    <div class="quick-header">
+      <p class="quick-eyebrow">{{ t('dashboard.nextStepEyebrow') }}</p>
+      <h2 id="quick-actions-title">{{ t('dashboard.quickActions') }}</h2>
+      <p>{{ t('dashboard.quickActionsDesc') }}</p>
     </div>
-    <div class="space-y-3 p-4">
-      <button @click="router.push('/keys')" class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800">
-        <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary-100 transition-transform group-hover:scale-105 dark:bg-primary-900/30">
-          <Icon name="key" size="lg" class="text-primary-600 dark:text-primary-400" />
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('dashboard.createApiKey') }}</p>
-          <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('dashboard.generateNewKey') }}</p>
-        </div>
-        <Icon
-          name="chevronRight"
-          size="md"
-          class="text-gray-400 transition-colors group-hover:text-primary-500 dark:text-dark-500"
-        />
-      </button>
 
-      <button @click="router.push('/usage')" class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800">
-        <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 transition-transform group-hover:scale-105 dark:bg-emerald-900/30">
-          <Icon name="chart" size="lg" class="text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('dashboard.viewUsage') }}</p>
-          <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('dashboard.checkDetailedLogs') }}</p>
-        </div>
-        <Icon
-          name="chevronRight"
-          size="md"
-          class="text-gray-400 transition-colors group-hover:text-emerald-500 dark:text-dark-500"
-        />
-      </button>
-
-      <button v-if="canUseBatchImage" @click="router.push('/batch-image')" class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800">
-        <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-sky-100 transition-transform group-hover:scale-105 dark:bg-sky-900/30">
-          <Icon name="sparkles" size="lg" class="text-sky-600 dark:text-sky-400" />
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('dashboard.batchImageAgent') }}</p>
-          <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('dashboard.batchImageAgentDesc') }}</p>
-        </div>
-        <Icon
-          name="chevronRight"
-          size="md"
-          class="text-gray-400 transition-colors group-hover:text-sky-500 dark:text-dark-500"
-        />
-      </button>
-
-      <button @click="router.push('/redeem')" class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800">
-        <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 transition-transform group-hover:scale-105 dark:bg-amber-900/30">
-          <Icon name="gift" size="lg" class="text-amber-600 dark:text-amber-400" />
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('dashboard.redeemCode') }}</p>
-          <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('dashboard.addBalanceWithCode') }}</p>
-        </div>
-        <Icon
-          name="chevronRight"
-          size="md"
-          class="text-gray-400 transition-colors group-hover:text-amber-500 dark:text-dark-500"
-        />
+    <div class="space-y-2 p-3">
+      <button
+        v-for="action in actions"
+        :key="action.path"
+        v-show="!action.requiresBatchImage || canUseBatchImage"
+        type="button"
+        class="quick-action group"
+        :class="`quick-action--${action.tone}`"
+        @click="router.push(action.path)"
+      >
+        <span class="quick-action__icon">
+          <Icon :name="action.icon" size="md" :stroke-width="2" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold text-gray-950 dark:text-white">{{ t(action.labelKey) }}</span>
+          <span class="mt-0.5 block text-xs leading-5 text-gray-500 dark:text-dark-300">{{ t(action.descriptionKey) }}</span>
+        </span>
+        <Icon name="chevronRight" size="sm" class="quick-action__arrow" />
       </button>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -73,11 +35,129 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+
 const router = useRouter()
 const { t } = useI18n()
 const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
+
+// 快捷入口集中配置，新增入口时无需复制整段模板。
+const actions = [
+  { path: '/keys', icon: 'key', tone: 'teal', labelKey: 'dashboard.createApiKey', descriptionKey: 'dashboard.generateNewKey', requiresBatchImage: false },
+  { path: '/usage', icon: 'chart', tone: 'blue', labelKey: 'dashboard.viewUsage', descriptionKey: 'dashboard.checkDetailedLogs', requiresBatchImage: false },
+  { path: '/batch-image', icon: 'sparkles', tone: 'violet', labelKey: 'dashboard.batchImageAgent', descriptionKey: 'dashboard.batchImageAgentDesc', requiresBatchImage: true },
+  { path: '/redeem', icon: 'gift', tone: 'amber', labelKey: 'dashboard.redeemCode', descriptionKey: 'dashboard.addBalanceWithCode', requiresBatchImage: false },
+] as const
 
 onMounted(() => {
   void refreshBatchImageAccess()
 })
 </script>
+
+<style scoped>
+.quick-panel {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.quick-header {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 1.1rem 1.25rem;
+}
+
+.quick-header h2 {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.quick-header h2 + p {
+  margin-top: 0.25rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.quick-eyebrow {
+  margin-bottom: 0.25rem;
+  color: #0f9488;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.quick-action {
+  --action-rgb: 13, 148, 136;
+  display: flex;
+  width: 100%;
+  min-height: 4.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.75rem;
+  text-align: left;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.quick-action:hover {
+  border-color: rgba(var(--action-rgb), 0.24);
+  background: rgba(var(--action-rgb), 0.055);
+  transform: translateX(2px);
+}
+
+.quick-action--blue { --action-rgb: 37, 99, 235; }
+.quick-action--violet { --action-rgb: 124, 58, 237; }
+.quick-action--amber { --action-rgb: 217, 119, 6; }
+
+.quick-action__icon {
+  display: flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--action-rgb), 0.18);
+  border-radius: 8px;
+  background: rgba(var(--action-rgb), 0.08);
+  color: rgb(var(--action-rgb));
+}
+
+.quick-action__arrow {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.quick-action:hover .quick-action__arrow {
+  color: rgb(var(--action-rgb));
+  transform: translateX(2px);
+}
+
+:global(.dark .quick-panel) {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(4, 8, 17, 0.78);
+}
+
+:global(.dark .quick-header) { border-color: rgba(148, 163, 184, 0.1); }
+:global(.dark .quick-header h2) { color: #f8fafc; }
+:global(.dark .quick-header h2 + p) { color: #94a3b8; }
+
+:global(.dark .quick-action:hover) {
+  border-color: rgba(var(--action-rgb), 0.26);
+  background: rgba(var(--action-rgb), 0.09);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-action,
+  .quick-action__arrow {
+    transition: none;
+  }
+
+  .quick-action:hover,
+  .quick-action:hover .quick-action__arrow {
+    transform: none;
+  }
+}
+</style>
