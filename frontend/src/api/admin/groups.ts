@@ -252,16 +252,38 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
  * @returns Group usage statistics
  */
 export async function getStats(id: number): Promise<{
+  group_id: number
+  group_name: string
   total_api_keys: number
   active_api_keys: number
   total_requests: number
   total_cost: number
+  account_count: number
+  active_accounts: number
+  window: {
+    start: string
+    end: string
+  }
+  data_source: string
+  generated_at: string
+  partial: boolean
 }> {
   const { data } = await apiClient.get<{
+    group_id: number
+    group_name: string
     total_api_keys: number
     active_api_keys: number
     total_requests: number
     total_cost: number
+    account_count: number
+    active_accounts: number
+    window: {
+      start: string
+      end: string
+    }
+    data_source: string
+    generated_at: string
+    partial: boolean
   }>(`/admin/groups/${id}/stats`)
   return data
 }

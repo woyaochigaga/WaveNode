@@ -188,6 +188,36 @@ func (s *RedeemCodeRepoSuite) TestListWithFilters_StatusExpiredByExpiresAt() {
 	s.Require().Equal("STAT-UNUSED-FUTURE", unused[0].Code)
 }
 
+func (s *RedeemCodeRepoSuite) TestGetStats() {
+	past := time.Now().UTC().Add(-time.Hour)
+	future := time.Now().UTC().Add(time.Hour)
+	usedAt := time.Now().UTC()
+
+	codes := []service.RedeemCode{
+		{Code: "STATS-ACTIVE-BALANCE", Type: service.RedeemTypeBalance, Value: 10, Status: service.StatusUnused, ExpiresAt: &future},
+		{Code: "STATS-ACTIVE-INVITATION", Type: service.RedeemTypeInvitation, Value: 0, Status: service.StatusUnused},
+		{Code: "STATS-USED-BALANCE", Type: service.RedeemTypeBalance, Value: 12, Status: service.StatusUsed, UsedAt: &usedAt},
+		{Code: "STATS-EXPIRED-STATUS", Type: service.RedeemTypeSubscription, Value: 5, Status: service.StatusExpired},
+		{Code: "STATS-EXPIRED-TIME", Type: service.RedeemTypeSubscription, Value: 7, Status: service.StatusUnused, ExpiresAt: &past},
+		{Code: "STATS-DISABLED", Type: service.RedeemTypeConcurrency, Value: 3, Status: service.StatusDisabled},
+	}
+	for i := range codes {
+		s.Require().NoError(s.repo.Create(s.ctx, &codes[i]))
+	}
+
+	stats, err := s.repo.GetStats(s.ctx)
+	s.Require().NoError(err)
+	s.Equal(int64(6), stats.TotalCodes)
+	s.Equal(int64(2), stats.ActiveCodes)
+	s.Equal(int64(1), stats.UsedCodes)
+	s.Equal(int64(2), stats.ExpiredCodes)
+	s.Equal(float64(12), stats.TotalValueDistributed)
+	s.Equal(int64(2), stats.ByType[service.RedeemTypeBalance])
+	s.Equal(int64(2), stats.ByType[service.RedeemTypeSubscription])
+	s.Equal(int64(1), stats.ByType[service.RedeemTypeInvitation])
+	s.Equal(int64(1), stats.ByType[service.RedeemTypeConcurrency])
+}
+
 func (s *RedeemCodeRepoSuite) TestListWithFilters_Search() {
 	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{Code: "ALPHA-CODE", Type: service.RedeemTypeBalance, Value: 0, Status: service.StatusUnused}))
 	s.Require().NoError(s.repo.Create(s.ctx, &service.RedeemCode{Code: "BETA-CODE", Type: service.RedeemTypeBalance, Value: 0, Status: service.StatusUnused}))

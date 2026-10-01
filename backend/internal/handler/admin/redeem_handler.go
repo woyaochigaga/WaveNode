@@ -373,19 +373,22 @@ func (h *RedeemHandler) Expire(c *gin.Context) {
 // GetStats handles getting redeem code statistics
 // GET /api/v1/admin/redeem-codes/stats
 func (h *RedeemHandler) GetStats(c *gin.Context) {
-	// Return mock data for now
-	response.Success(c, gin.H{
-		"total_codes":             0,
-		"active_codes":            0,
-		"used_codes":              0,
-		"expired_codes":           0,
-		"total_value_distributed": 0.0,
-		"by_type": gin.H{
-			"balance":     0,
-			"concurrency": 0,
-			"trial":       0,
-		},
-	})
+	if h.redeemService == nil {
+		response.Error(c, 503, "Redeem statistics service unavailable")
+		return
+	}
+
+	stats, err := h.redeemService.GetStats(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	stats["window"] = "all_time"
+	stats["data_source"] = "redeem_codes"
+	stats["generated_at"] = time.Now().UTC()
+	stats["partial"] = false
+
+	response.Success(c, stats)
 }
 
 // Export handles exporting redeem codes to CSV

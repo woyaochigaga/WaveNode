@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -17,9 +18,9 @@ func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	adminSvc := newStubAdminService()
 
 	userHandler := NewUserHandler(adminSvc, nil, nil, nil, nil, nil, nil)
-	groupHandler := NewGroupHandler(adminSvc, nil, nil)
+	groupHandler := NewGroupHandler(adminSvc, newAdminStatsDashboardService(), nil)
 	proxyHandler := NewProxyHandler(adminSvc)
-	redeemHandler := NewRedeemHandler(adminSvc, nil)
+	redeemHandler := NewRedeemHandler(adminSvc, service.NewRedeemService(&adminStatsRedeemRepo{}, nil, nil, nil, nil, nil, nil, nil))
 
 	router.GET("/api/v1/admin/users", userHandler.List)
 	router.GET("/api/v1/admin/users/:id", userHandler.GetByID)
@@ -64,6 +65,7 @@ func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	router.DELETE("/api/v1/admin/redeem-codes/:id", redeemHandler.Delete)
 	router.POST("/api/v1/admin/redeem-codes/batch-delete", redeemHandler.BatchDelete)
 	router.POST("/api/v1/admin/redeem-codes/:id/expire", redeemHandler.Expire)
+	router.GET("/api/v1/admin/redeem-codes/stats", redeemHandler.GetStats)
 	router.GET("/api/v1/admin/redeem-codes/:id/stats", redeemHandler.GetStats)
 
 	return router, adminSvc

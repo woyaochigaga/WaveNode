@@ -55,14 +55,14 @@ Sub2API 已经具备“AI API 网关 + 订阅配额平台”的完整雏形，�
 
 源码中已经出现一些应优先处理的信号：
 
-- AccountService.TestCredentials 对 Anthropic、OpenAI、Gemini 仍是空实现。
-- ProxyService.TestConnection 仍是空实现。
+- 遗留的 AccountService.TestCredentials 对 Anthropic、OpenAI、Gemini 仍是空实现；管理员 SSE 测试入口已有 AccountTestService，但还没有统一健康快照。
+- 遗留的 ProxyService.TestConnection 仍是空实现；管理员入口已有 ProxyProber 基础探测，但结果语义和错误分类尚未统一。
 - adminServiceImpl.RefreshAccountCredentials 仍是空实现。
 - 分组统计接口返回固定的零值模拟数据。
 - 兑换码统计接口仍返回固定零值。
 - OpenAI Live 会话的最终用量记录明确写着目前不计费。
 - 钉钉 OAuth 的 appToken 仍是单实例内存缓存，并留下多实例 Redis 集中缓存 TODO。
-- 项目已有约 289 个数据库迁移文件，且部署文档明确迁移为正向、回滚依赖备份恢复。
+- 项目当前有 289 个 SQL 数据库迁移文件，`backend/migrations` 另有 Go 嵌入和测试辅助文件；部署文档明确迁移为正向、回滚依赖备份恢复。
 
 这些问题不一定都是 bug，但会降低后台数据可信度、增加运营误判，并让新功能继续堆叠在不完整的基础上。
 
@@ -106,7 +106,7 @@ Sub2API 已经具备“AI API 网关 + 订阅配额平台”的完整雏形，�
 
 ### 4.1 完成账号凭证测试
 
-现状：backend/internal/service/account_service.go 的 TestCredentials 对 Anthropic、OpenAI、Gemini 仍直接返回 nil，管理员点击“测试账号”无法区分凭证无效、网络不可达、权限不足和平台限流。
+现状：`backend/internal/service/account_service.go` 的遗留 `TestCredentials` 对 Anthropic、OpenAI、Gemini 仍直接返回 nil；当前管理员入口 `POST /api/v1/admin/accounts/:id/test` 已经通过 `AccountTestService` 支持多种真实测试，但测试结果主要通过 SSE 输出，尚未沉淀为统一的结构化健康快照。两条路径并存会导致调用方对“测试成功”的含义不一致。
 
 建议实现：
 
@@ -139,7 +139,7 @@ Sub2API 已经具备“AI API 网关 + 订阅配额平台”的完整雏形，�
 
 ### 4.2 完成代理连接测试
 
-现状：backend/internal/service/proxy_service.go 的 TestConnection 获取代理后直接返回成功。
+现状：`backend/internal/service/proxy_service.go` 的遗留 `TestConnection` 获取代理后直接返回成功；当前管理员入口 `POST /api/v1/admin/proxies/:id/test` 已经通过 `adminServiceImpl.TestProxy` 和 `ProxyProber` 执行基础探测，但错误分类、SSRF 探测目标约束、健康快照字段和旧服务方法的语义尚未统一。
 
 建议实现：
 
@@ -182,8 +182,8 @@ Sub2API 已经具备“AI API 网关 + 订阅配额平台”的完整雏形，�
 
 以下接口不能继续返回静态零值：
 
-- 分组统计：backend/internal/handler/admin/group_handler.go。
-- 兑换码统计：backend/internal/service/redeem_service.go。
+- 分组统计：`backend/internal/handler/admin/group_handler.go` 的 `GetStats` 当前直接返回 mock；虽然 `GroupService.GetStats` 已能返回基础账号数，但尚未接入该 Handler，也没有请求量和费用统计。
+- 兑换码统计：`backend/internal/handler/admin/redeem_handler.go` 的 `GetStats` 当前直接返回 mock，`backend/internal/service/redeem_service.go` 的 `GetStats` 也仍是 TODO。
 
 建议优先从现有用量、用户、API Key、订单和兑换码数据聚合出可解释结果；如果数据量较大，再增加日/小时汇总表。响应中应加入：
 
@@ -1461,14 +1461,15 @@ SDK 重点支持 API Key、流式、自动重试、幂等键、错误类型、�
 
 ## 22. 最终执行顺序
 
-建议不要同时启动所有方向，采用以下顺序：
+建议不要同时启动所有方向。P0 的风险等级决定必须优先解决，但实际开发应先完成低风险、能快速验证的项目，再进入涉及账务和启动流程的改造：
 
-1. 先做 P0-1 到 P0-7，目标是数据不丢、钱不乱、权限不越权、后台结果可信。
-2. 再做 P1-1 到 P1-6，目标是配置、模型、价格、路由和计费可解释。
-3. 接着做 P1-7 到 P1-12，目标是 Provider 可扩展、任务可运维、故障可定位。
-4. 基础稳定后做 P2-1 到 P2-4，目标是组织化、商业化和开发者自助接入。
-5. 按客户需求选择 P2-5 到 P2-10 的平台和企业能力。
-6. 最后再评估 P3 智能路由、语义缓存、Marketplace 和多区域架构。
+1. 先做统计 mock 清除、敏感字段门禁和权限语义盘点，目标是快速消除错误数据和明显安全回归。
+2. 再做结构化凭证/代理测试，目标是让后台测试结果可信，并复用当前已经存在的测试器和探测器。
+3. 接着做账号刷新、多实例临时状态和账号生命周期，目标是让凭证状态可以持续维护。
+4. 然后做 Live/异步媒体成本保护，再做迁移 preflight 和恢复演练；这两类改造风险较高，必须先具备回滚和观测能力。
+5. 再做 P1-1 到 P1-6，目标是配置、模型、价格、路由和计费可解释。
+6. 接着做 P1-7 到 P1-12，目标是 Provider 可扩展、任务可运维、故障可定位。
+7. 基础稳定后做 P2，最后再评估 P3 智能路由、语义缓存、Marketplace 和多区域架构。
 
 判断是否可以进入下一阶段的门槛：
 
@@ -1477,3 +1478,139 @@ SDK 重点支持 API Key、流式、自动重试、幂等键、错误类型、�
 - 没有配置版本和回滚前，不开放复杂的动态策略。
 - 没有备份恢复演练前，不做大规模数据库迁移。
 - 没有插件权限和签名治理前，不开放第三方 Marketplace。
+
+## 23. 首批实施包：简单、重要、可快速验证
+
+本节把前面的 P0/P1 建议转换为首批可直接拆分的开发包。排序同时考虑事故影响、实现复杂度、现有代码复用程度和回滚难度。首批不重写网关、不替换现有账单、不一次性迁移所有数据。
+
+### 23.1 首批排序
+
+| 批次 | 优先级 | 实施包 | 预计复杂度 | 先做原因 | 完成门槛 | 当前状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| B0 | P0 | 清除分组/兑换码统计 mock | 低 | 现有路由和查询基础已经存在，收益立刻可见 | 接口返回真实数据并有窗口、来源、时间戳 | 已完成 |
+| B1 | P0 | 敏感字段扫描和日志 allowlist | 低到中 | 不依赖业务重构，能防止后续改动扩大泄漏面 | CI canary、日志和导出路径均通过扫描 | 待开始 |
+| B2 | P0 | 结构化账号与代理测试结果 | 中 | 复用 `AccountTestService`、`ProxyProber`，主要补契约和落库 | 成功、超时、401/403/429、代理失败可区分 | 待开始 |
+| B3 | P0 | 账号刷新并发控制与集中临时状态 | 中 | 解决凭证过期和多实例不一致，直接影响账号池可用性 | 同一账号并发刷新只产生一次副作用 | 待开始 |
+| B4 | P0 | Live 和异步媒体最小成本护栏 | 中到高 | 涉及余额和结算，必须在统一账本前先限制损失上限 | 不能零价无限创建，断流和重试可收敛 | 待开始 |
+| B5 | P0 | 迁移 preflight、备份校验和恢复演练 | 中到高 | 影响发布和数据安全，需独立于业务功能灰度 | 可恢复到临时库并完成 smoke test | 待开始 |
+| B6 | P1 | 配置版本、错误码和 Route Trace 最小版 | 中 | 为后续 Adapter、账务和告警提供可解释性 | 一次请求能关联配置版本、错误码和路由摘要 | 待开始 |
+
+B0、B1 可以并行；B2 依赖 B1 的脱敏规则；B3 依赖现有 OAuth/锁能力；B4 和 B5 不应在没有测试环境、备份和监控的情况下直接上线；B6 是后续 P1 标准化的入口。
+
+### 23.2 B0：清除统计 mock
+
+**现状和源码落点**：
+
+- `backend/internal/handler/admin/group_handler.go:GetStats` 当前直接返回固定零值，且解析出的 `groupID` 没有用于查询。
+- `backend/internal/service/group_service.go:GroupService.GetStats` 已有基础分组和账号数量查询，但没有被该 Handler 直接使用。
+- `backend/internal/handler/admin/redeem_handler.go:GetStats` 当前直接返回固定零值。
+- `backend/internal/service/redeem_service.go:RedeemService.GetStats` 仍未实现；`RedeemCodeRepository` 目前有列表和分页能力，但没有聚合统计方法。
+
+**第一版设计**：
+
+1. 新增明确 DTO：`GroupStatsResponse` 和 `RedeemStatsResponse`，不要继续使用无类型 `map[string]any`。
+2. 保留现有 URL，不改变前端调用方式：
+   - `GET /api/v1/admin/groups/:id/stats`
+   - `GET /api/v1/admin/redeem-codes/stats`
+3. 分组统计先返回 `group_id`、`account_count`、`active_account_count`、`request_count`、`total_cost`、`window`、`data_source`、`generated_at`、`partial`。
+4. 兑换码统计通过 SQL 聚合完成，至少返回 `total_codes`、`active_codes`、`used_codes`、`expired_codes`、`total_value_distributed` 和 `by_type`；禁止先加载全部兑换码到内存再统计。
+5. 没有时间范围时使用明确默认窗口，并在响应中返回窗口起止时间；空数据返回真实的 0，不返回“未实现”假数据。
+6. 查询超时或部分统计不可用时返回 `partial=true` 和安全的 `data_source`，不能把失败伪装成 0。
+
+**具体实现顺序**：
+
+1. 在 repository 接口增加 `GetStats`/`GetAggregatedStats`，实现 SQL `COUNT`、`FILTER`、`COALESCE` 和必要索引。
+2. 在 service 层统一时间窗口、状态口径和金额精度。
+3. Handler 调用 service 并返回 DTO；保留旧字段，新增字段只向后兼容追加。
+4. 前端补充加载、空数据、部分数据和错误状态，并展示 `generated_at`。
+
+**测试和回滚**：
+
+- Handler 单测验证 group ID 被传递、权限失败和查询失败不会返回 mock 零值。
+- Repository 集成测试覆盖空表、已用/未用/过期、不同兑换码类型和金额汇总。
+- 使用旧接口字段兼容快照测试；如果聚合查询性能不达标，先回退到受限时间窗口和已有预聚合，不删除旧接口。
+
+**验收**：连续创建、使用、过期三类兑换码后，统计与列表逐项一致；分组内新增请求后，窗口内请求量和费用可在刷新后看到，且响应标记真实数据来源。
+
+### 23.3 B1：敏感字段扫描和日志 allowlist
+
+**第一版范围**：只治理新增和高风险路径，不要求一次性重写所有历史日志。
+
+- 在 `backend/internal/util/logredact` 现有脱敏能力上增加 canary secret、Authorization、Cookie、refresh token、代理密码、私钥和原始 Prompt 的测试样本。
+- 对 ops 日志、错误响应、审计 detail、账号导出、诊断包和插件 UI Bridge 分别建立 allowlist。
+- 结构化日志禁止直接序列化完整 `map[string]any`；敏感字段只能通过命名的脱敏函数写入。
+- 账号导出继续保留 step-up 要求，新增下载审计、短时效和响应头检查。
+
+**验证**：测试请求中放入 canary 值，检查日志文件、HTTP 响应、审计记录和诊断包；任何完整 canary 出现都使 CI 失败。该包不修改业务数据，不需要数据库迁移，可直接回滚扫描规则，但默认规则必须保持 fail-close。
+
+### 23.4 B2：结构化账号与代理测试结果
+
+**复用边界**：不重写现有真实测试逻辑。
+
+- 账号测试复用 `backend/internal/service/account_test_service.go` 的平台测试函数；遗留 `AccountService.TestCredentials` 要么委托到统一探测器，要么明确标记为内部兼容入口，禁止继续无条件返回 nil。
+- 代理测试复用 `adminServiceImpl.TestProxy` 和 `ProxyProber`；遗留 `ProxyService.TestConnection` 必须与管理员入口统一结果语义，不能单独返回成功。
+- 新增内部结果结构：`status`、`stage`、`error_code`、`http_status`、`latency_ms`、`tested_at`、`credential_expires_at`、`safe_to_schedule`，敏感信息只返回布尔值或脱敏摘要。
+- 旧 SSE 账号测试继续兼容，同时增加最终 summary 事件或后台健康快照；不能让前端从自由文本推断成功失败。
+- 测试失败默认只写健康结果和审计，不自动暂停账号；自动暂停必须由策略开关控制。
+
+**接口和测试**：保留 `POST /api/v1/admin/accounts/:id/test` 和 `POST /api/v1/admin/proxies/:id/test`，新增结构化字段不破坏旧客户端。覆盖 401、403、429、超时、代理认证失败、DNS/TLS 失败、取消请求和脱敏断言。测试探测使用固定安全目标，禁止把任意用户提供 URL 直接作为代理探测地址。
+
+### 23.5 B3：账号刷新并发控制与集中临时状态
+
+**第一版只解决两件事**：刷新副作用只能发生一次；跨实例的临时 OAuth 状态不能依赖单机内存。
+
+- 在 `backend/internal/service/admin_account.go:RefreshAccountCredentials` 统一委托现有 OAuth refresher；按账号 ID 获取 Redis 分布式锁，锁值包含操作 ID，设置租约和续期。
+- 刷新前保留旧凭证，刷新成功后以版本号或更新时间原子替换；刷新失败只记录结构化错误，不清空仍可能有效的旧凭证。
+- 复用现有 OAuth provider 实现，不把所有平台强行抽象成同一种 refresh token 流程；不支持刷新的平台返回 `refresh_unsupported`。
+- 将 `backend/internal/handler/auth_dingtalk_client.go` 的 appToken 从单实例字段迁移为 Redis 优先、内存短缓存兜底，增加 TTL、互斥刷新和失效重试。
+- 进程重启后不能依赖内存恢复“正在刷新”状态，未完成操作根据锁过期后重新读取账号状态决定是否重试。
+
+**验收**：两实例并发刷新只产生一次上游刷新调用；刷新失败后旧凭证仍可被明确查询为保留状态；日志、Redis 值、审计和 API 响应中均没有 Token 原文。
+
+### 23.6 B4：Live 和异步媒体最小成本护栏
+
+这是账务改造前的保护层，不等同于完整不可变账本。
+
+- 复用已有余额检查、`usage_billing_dedup` 和 `IdempotencyCoordinator`，增加请求级 `estimated_max_cost` 和 `billing_guard_status`。
+- Live 创建前按最大时长或管理员配置上限冻结；结束、取消、断流和进程恢复走同一幂等 finalize；未知价格默认拒绝或进入明确的免费策略，不能静默按零价。
+- 图片、视频和长时间异步任务创建时使用任务级幂等键和最大预算；轮询不重复冻结，失败只释放未使用部分。
+- 第一版允许按 group/API Key 灰度启用硬限制，保留 observe-only 记录，管理员能查看拦截原因。
+
+**测试**：并发创建、重复 finalize、客户端取消、上游 429、SSE/WS 断开、Worker 重启、Redis 短时不可用和未知价格均需验证。出现账务结果异常时，通过关闭灰度开关回退到旧路径，但不允许回退到无限制零价路径。
+
+### 23.7 B5：迁移 preflight、备份校验和恢复演练
+
+**实施顺序**：
+
+1. 先做只读 preflight：当前迁移版本、目标版本、数据库连接、磁盘空间、Redis、关键密钥、未结算任务和备份年龄。
+2. 备份完成后校验文件大小、checksum、数据库版本和关键表行数摘要。
+3. 在临时 PostgreSQL 实例恢复，执行用户、账号、API Key、价格、支付订单、兑换码和加密字段 smoke test。
+4. 只有恢复演练通过才允许生产迁移；生产环境单实例迁移，其他实例等待就绪，不接收业务流量。
+5. 将迁移、备份和恢复操作记录到带 operation ID 的审计日志中。
+
+**注意**：项目已有备份服务和迁移测试，首批工作是增加 preflight 和“恢复可用”证据，不重复建设新的备份格式。迁移失败只允许按已验证的备份恢复手册处理，不承诺对所有 SQL 迁移提供自动 down migration。
+
+### 23.8 B6：配置版本、错误码和 Route Trace 最小版
+
+第一版只保存元数据，不保存原始 Prompt、完整响应、Token、Cookie 或代理密码。
+
+- 给动态配置增加 `version`、`updated_at`、`updated_by`、`effective_at`，写入使用 CAS；Redis 通知丢失时通过版本轮询最终收敛。
+- 统一内部错误码和 `retryable`、`retry_after`，对外继续按 OpenAI/Anthropic/Gemini 协议格式返回。
+- 在请求上下文中记录 `request_id`、原始模型、最终模型、endpoint、候选账号数、过滤原因摘要、最终账号匿名 ID、重试次数、降级原因、配置版本和价格版本。
+- 增加 `GET /api/v1/admin/ops/requests/:request_id/route-trace`，按管理员权限返回脱敏摘要；普通用户只拿到 request ID 和安全错误码。
+
+**验收**：给定一次失败请求，管理员能回答“使用了哪个配置版本、尝试了哪些候选、为何切换、最终返回何种错误、是否产生费用”，且无法从 Trace 还原 Prompt 或凭证。
+
+## 24. 首批实施的统一 Definition of Done
+
+每个 B0-B6 实施包都必须同时满足以下条件，不能只以“代码合并”作为完成标准：
+
+1. 有源码落点和接口契约，明确是否兼容旧客户端。
+2. 有单元测试和至少一个跨组件测试；涉及 Redis/PostgreSQL 时必须覆盖多实例或事务边界。
+3. 有结构化日志、指标或审计记录，能定位失败原因而不是只返回 500。
+4. 有灰度开关、observe-only 或旧路径回退方案；账务和权限功能默认 fail-safe。
+5. 有数据迁移、保留和清理说明；没有迁移必要时明确写出“无需迁移”。
+6. 有前端加载、空状态、错误状态、权限状态和旧接口兼容处理。
+7. 有验收数据样例，能由开发、测试和运营共同复核。
+
+首批 B0-B3 完成后，才进入 B4/B5；B4/B5 完成并通过恢复、断流和重复消费演练后，才进入 B6 以及更大范围的 Provider 扩展。这样可以先用低风险改动修正可信度，再逐步进入计费、启动和架构级改造。

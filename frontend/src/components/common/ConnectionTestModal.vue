@@ -204,6 +204,9 @@ const loadModels = async () => {
       ? await adminAPI.groups.getTestModels(props.targetId)
       : await keysAPI.getTestModels(props.targetId)
     selectedModel.value = preferredModel(availableModels.value)
+    if (!selectedModel.value) {
+      setError(t('common.connectionTest.noModels'))
+    }
   } catch (error) {
     availableModels.value = []
     setError(readErrorMessage(error))

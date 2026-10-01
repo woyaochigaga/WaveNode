@@ -74,6 +74,22 @@ type RedeemCodeRepository interface {
 	SumPositiveBalanceByUser(ctx context.Context, userID int64) (float64, error)
 }
 
+// RedeemCodeStats 保存后台统计所需的兑换码聚合结果。
+// 单独定义该结果类型可以让旧的 Repository 测试替身继续服务兑换流程，
+// 而具体 Repository 可以渐进式增加统计查询能力。
+type RedeemCodeStats struct {
+	TotalCodes            int64
+	ActiveCodes           int64
+	UsedCodes             int64
+	ExpiredCodes          int64
+	TotalValueDistributed float64
+	ByType                map[string]int64
+}
+
+type redeemCodeStatsRepository interface {
+	GetStats(ctx context.Context) (RedeemCodeStats, error)
+}
+
 // GenerateCodesRequest 生成兑换码请求
 type GenerateCodesRequest struct {
 	Count int     `json:"count"`
@@ -672,18 +688,24 @@ func (s *RedeemService) Delete(ctx context.Context, id int64) error {
 
 // GetStats 获取兑换码统计信息
 func (s *RedeemService) GetStats(ctx context.Context) (map[string]any, error) {
-	// TODO: 实现统计逻辑
-	// 统计未使用、已使用的兑换码数量
-	// 统计总面值等
-
-	stats := map[string]any{
-		"total_codes":  0,
-		"unused_codes": 0,
-		"used_codes":   0,
-		"total_value":  0.0,
+	repo, ok := s.redeemRepo.(redeemCodeStatsRepository)
+	if !ok {
+		return nil, fmt.Errorf("redeem code statistics repository is unavailable")
 	}
 
-	return stats, nil
+	stats, err := repo.GetStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get redeem code statistics: %w", err)
+	}
+
+	return map[string]any{
+		"total_codes":             stats.TotalCodes,
+		"active_codes":            stats.ActiveCodes,
+		"used_codes":              stats.UsedCodes,
+		"expired_codes":           stats.ExpiredCodes,
+		"total_value_distributed": stats.TotalValueDistributed,
+		"by_type":                 stats.ByType,
+	}, nil
 }
 
 // GetUserHistory 获取用户的兑换历史

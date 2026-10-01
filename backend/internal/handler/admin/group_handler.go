@@ -987,15 +987,67 @@ func (h *GroupHandler) GetStats(c *gin.Context) {
 		response.BadRequest(c, "Invalid group ID")
 		return
 	}
+	if h.dashboardService == nil {
+		response.Error(c, 503, "Group statistics service unavailable")
+		return
+	}
 
-	// Return mock data for now
+	group, err := h.adminService.GetGroup(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	// 保持现有接口字段，同时使用仓储层分组和 Dashboard 服务。
+	// API Key 查询设置上限，避免异常大分组把统计接口变成无界查询。
+	keys, totalKeys, err := h.adminService.GetGroupAPIKeys(c.Request.Context(), groupID, 1, 10000)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	activeKeys := int64(0)
+	for i := range keys {
+		if keys[i].Status == service.StatusAPIKeyActive && !keys[i].IsExpired() {
+			activeKeys++
+		}
+	}
+
+	startTime, endTime := parseTimeRange(c)
+	usage, err := h.dashboardService.GetGroupStatsWithFilters(
+		c.Request.Context(), startTime, endTime, 0, 0, 0, groupID, nil, nil, nil,
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	var requests int64
+	var totalCost float64
+	for i := range usage {
+		if usage[i].GroupID == groupID {
+			requests = usage[i].Requests
+			totalCost = usage[i].Cost
+			break
+		}
+	}
+
 	response.Success(c, gin.H{
-		"total_api_keys":  0,
-		"active_api_keys": 0,
-		"total_requests":  0,
-		"total_cost":      0.0,
+		"group_id":        groupID,
+		"group_name":      group.Name,
+		"total_api_keys":  totalKeys,
+		"active_api_keys": activeKeys,
+		"total_requests":  requests,
+		"total_cost":      totalCost,
+		"account_count":   group.AccountCount,
+		"active_accounts": group.ActiveAccountCount,
+		"window": gin.H{
+			"start": startTime,
+			"end":   endTime,
+		},
+		"data_source":  "group_api_keys+usage_logs",
+		"generated_at": time.Now().UTC(),
+		"partial":      totalKeys > int64(len(keys)),
 	})
-	_ = groupID // TODO: implement actual stats
 }
 
 // GetUsageSummary returns today's, yesterday's, and cumulative cost for all groups.

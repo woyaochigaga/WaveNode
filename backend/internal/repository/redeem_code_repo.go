@@ -408,6 +408,86 @@ func (r *redeemCodeRepository) SumPositiveBalanceByUser(ctx context.Context, use
 	return result[0].Sum, nil
 }
 
+// GetStats 在 PostgreSQL 中聚合兑换码统计，避免把全部兑换码加载到应用内存。
+// 清理 Worker 尚未更新状态的过期未使用兑换码也会被计入 expired。
+func (r *redeemCodeRepository) GetStats(ctx context.Context) (service.RedeemCodeStats, error) {
+	now := time.Now()
+	base := r.client.RedeemCode.Query()
+
+	total, err := base.Count(ctx)
+	if err != nil {
+		return service.RedeemCodeStats{}, err
+	}
+
+	active, err := r.client.RedeemCode.Query().Where(
+		redeemcode.StatusEQ(service.StatusUnused),
+		redeemcode.Or(
+			redeemcode.ExpiresAtIsNil(),
+			redeemcode.ExpiresAtGT(now),
+		),
+	).Count(ctx)
+	if err != nil {
+		return service.RedeemCodeStats{}, err
+	}
+
+	used, err := r.client.RedeemCode.Query().Where(redeemcode.StatusEQ(service.StatusUsed)).Count(ctx)
+	if err != nil {
+		return service.RedeemCodeStats{}, err
+	}
+
+	expired, err := r.client.RedeemCode.Query().Where(
+		redeemcode.Or(
+			redeemcode.StatusEQ(service.StatusExpired),
+			redeemcode.And(
+				redeemcode.StatusEQ(service.StatusUnused),
+				redeemcode.ExpiresAtNotNil(),
+				redeemcode.ExpiresAtLTE(now),
+			),
+		),
+	).Count(ctx)
+	if err != nil {
+		return service.RedeemCodeStats{}, err
+	}
+
+	var valueResult []struct {
+		Sum float64 `json:"sum"`
+	}
+	if err := r.client.RedeemCode.Query().Where(
+		redeemcode.StatusEQ(service.StatusUsed),
+	).Aggregate(dbent.As(dbent.Sum(redeemcode.FieldValue), "sum")).Scan(ctx, &valueResult); err != nil {
+		return service.RedeemCodeStats{}, err
+	}
+
+	type typeCount struct {
+		Type  string `json:"type"`
+		Count int64  `json:"count"`
+	}
+	var typeResults []typeCount
+	if err := r.client.RedeemCode.Query().GroupBy(redeemcode.FieldType).
+		Aggregate(dbent.Count()).Scan(ctx, &typeResults); err != nil {
+		return service.RedeemCodeStats{}, err
+	}
+
+	byType := make(map[string]int64, len(typeResults))
+	for _, item := range typeResults {
+		byType[item.Type] = item.Count
+	}
+
+	var totalValue float64
+	if len(valueResult) > 0 {
+		totalValue = valueResult[0].Sum
+	}
+
+	return service.RedeemCodeStats{
+		TotalCodes:            int64(total),
+		ActiveCodes:           int64(active),
+		UsedCodes:             int64(used),
+		ExpiredCodes:          int64(expired),
+		TotalValueDistributed: totalValue,
+		ByType:                byType,
+	}, nil
+}
+
 func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 	if m == nil {
 		return nil

@@ -159,7 +159,11 @@ export async function getStats(): Promise<{
   used_codes: number
   expired_codes: number
   total_value_distributed: number
-  by_type: Record<RedeemCodeType, number>
+  by_type: Record<string, number>
+  window: string
+  data_source: string
+  generated_at: string
+  partial: boolean
 }> {
   const { data } = await apiClient.get<{
     total_codes: number
@@ -167,7 +171,11 @@ export async function getStats(): Promise<{
     used_codes: number
     expired_codes: number
     total_value_distributed: number
-    by_type: Record<RedeemCodeType, number>
+    by_type: Record<string, number>
+    window: string
+    data_source: string
+    generated_at: string
+    partial: boolean
   }>('/admin/redeem-codes/stats')
   return data
 }
