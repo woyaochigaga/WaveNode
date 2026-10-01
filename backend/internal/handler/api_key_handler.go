@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -20,7 +21,8 @@ import (
 
 // APIKeyHandler handles API key-related requests
 type APIKeyHandler struct {
-	apiKeyService *service.APIKeyService
+	apiKeyService      *service.APIKeyService
+	accountTestService *service.AccountTestService
 }
 
 // NewAPIKeyHandler creates a new APIKeyHandler
@@ -28,6 +30,97 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 	return &APIKeyHandler{
 		apiKeyService: apiKeyService,
 	}
+}
+
+// SetAccountTestService 注入 API Key 连接测试能力，同时保留现有轻量构造函数。
+func (h *APIKeyHandler) SetAccountTestService(accountTestService *service.AccountTestService) {
+	if h != nil {
+		h.accountTestService = accountTestService
+	}
+}
+
+type apiKeyConnectionTestRequest struct {
+	ModelID string `json:"model_id"`
+}
+
+// getOwnedTestableKey 集中处理用户侧测试前置校验，确保模型列表与正式测试使用同一套可用性规则。
+func (h *APIKeyHandler) getOwnedTestableKey(c *gin.Context) (*service.APIKey, bool) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return nil, false
+	}
+	keyID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || keyID <= 0 {
+		response.BadRequest(c, "Invalid key ID")
+		return nil, false
+	}
+	key, err := h.apiKeyService.GetByID(c.Request.Context(), keyID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return nil, false
+	}
+	if key.UserID != subject.UserID {
+		response.NotFound(c, "API key not found")
+		return nil, false
+	}
+	if !key.IsActive() {
+		response.ErrorFrom(c, infraerrors.BadRequest("API_KEY_TEST_DISABLED", "Enable this API key before testing its connection"))
+		return nil, false
+	}
+	if key.IsExpired() {
+		response.ErrorFrom(c, infraerrors.BadRequest("API_KEY_TEST_EXPIRED", "This API key has expired"))
+		return nil, false
+	}
+	if key.IsQuotaExhausted() {
+		response.ErrorFrom(c, infraerrors.BadRequest("API_KEY_TEST_QUOTA_EXHAUSTED", "This API key has exhausted its quota"))
+		return nil, false
+	}
+	if key.GroupID == nil || key.Group == nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("API_KEY_TEST_GROUP_REQUIRED", "Assign this API key to a group before testing"))
+		return nil, false
+	}
+	if !key.Group.IsActive() {
+		response.ErrorFrom(c, infraerrors.BadRequest("API_KEY_TEST_GROUP_DISABLED", "The group assigned to this API key is disabled"))
+		return nil, false
+	}
+	return key, true
+}
+
+// GetTestModels 返回 API Key 所属分组当前可执行的测试模型。
+// GET /api/v1/keys/:id/test-models
+func (h *APIKeyHandler) GetTestModels(c *gin.Context) {
+	if h.accountTestService == nil {
+		response.InternalError(c, "API key test service is unavailable")
+		return
+	}
+	key, ok := h.getOwnedTestableKey(c)
+	if !ok {
+		return
+	}
+	models, err := h.accountTestService.GetGroupTestModels(c.Request.Context(), key.Group)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"models": models})
+}
+
+// Test 通过 API Key 所属分组执行免计费连接探测。
+// POST /api/v1/keys/:id/test
+func (h *APIKeyHandler) Test(c *gin.Context) {
+	if h.accountTestService == nil {
+		response.InternalError(c, "API key test service is unavailable")
+		return
+	}
+	key, ok := h.getOwnedTestableKey(c)
+	if !ok {
+		return
+	}
+
+	var req apiKeyConnectionTestRequest
+	_ = c.ShouldBindJSON(&req)
+	_ = h.accountTestService.TestGroupConnection(c, key.Group, req.ModelID, "", "")
 }
 
 // CreateAPIKeyRequest represents the create API key request payload

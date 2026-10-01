@@ -419,6 +419,169 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	return s.testClaudeAccountConnection(c, account, modelID)
 }
 
+// GetGroupTestModels 返回分组中至少有一个可调度账号支持的模型，
+// 供分组和 API Key 测试共用，避免用户靠猜测选择测试模型。
+func (s *AccountTestService) GetGroupTestModels(ctx context.Context, group *Group) ([]string, error) {
+	if s == nil || s.accountRepo == nil {
+		return nil, errors.New("account test service is unavailable")
+	}
+	if group == nil || group.ID <= 0 {
+		return nil, errors.New("group is required for connection testing")
+	}
+
+	accounts, err := s.accountRepo.ListSchedulableByGroupID(ctx, group.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list schedulable group accounts: %w", err)
+	}
+
+	candidates := defaultModelsListCandidateIDs(group.Platform)
+	if group.ModelAllowlistEnabled() {
+		for _, model := range group.ModelAllowlist.Models {
+			model = strings.TrimSpace(model)
+			if model != "" && !strings.Contains(model, "*") {
+				candidates = append(candidates, model)
+			}
+		}
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	for _, model := range candidates {
+		seen[model] = struct{}{}
+	}
+	for _, account := range accounts {
+		if !groupTestAccountMatchesPlatform(group.Platform, &account) {
+			continue
+		}
+		for model := range account.GetModelMapping() {
+			model = strings.TrimSpace(model)
+			// 通配符用于描述路由策略，不是可以直接发起请求的模型 ID。
+			if model == "" || strings.Contains(model, "*") {
+				continue
+			}
+			if _, ok := seen[model]; ok {
+				continue
+			}
+			seen[model] = struct{}{}
+			candidates = append(candidates, model)
+		}
+	}
+
+	models := make([]string, 0, len(candidates))
+	seen = make(map[string]struct{}, len(candidates))
+	for _, model := range candidates {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		if group.ModelAllowlistEnabled() && !group.ModelAllowlist.Allows(model) {
+			continue
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		for i := range accounts {
+			if groupTestAccountSupportsModel(group.Platform, &accounts[i], model) {
+				seen[model] = struct{}{}
+				models = append(models, model)
+				break
+			}
+		}
+	}
+	return models, nil
+}
+
+// TestGroupConnection 从分组中选择可调度账号并复用账户测试协议。
+// 该方法只做健康检查，不产生用户用量，也不消耗 API Key 额度。
+func (s *AccountTestService) TestGroupConnection(c *gin.Context, group *Group, modelID, prompt, mode string) error {
+	if s == nil || s.accountRepo == nil {
+		return errors.New("account test service is unavailable")
+	}
+	if group == nil || group.ID <= 0 {
+		return errors.New("group is required for connection testing")
+	}
+
+	modelID = strings.TrimSpace(modelID)
+	if modelID == "" {
+		models, err := s.GetGroupTestModels(c.Request.Context(), group)
+		if err != nil {
+			return s.sendErrorAndEnd(c, "Failed to load test models")
+		}
+		if len(models) == 0 {
+			return s.sendErrorAndEnd(c, "No testable model is currently available in this group")
+		}
+		modelID = models[0]
+	}
+	if group.ModelAllowlistEnabled() && !group.ModelAllowlist.Allows(modelID) {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Model %s is not allowed by this group", modelID))
+	}
+
+	accounts, err := s.accountRepo.ListSchedulableByGroupID(c.Request.Context(), group.ID)
+	if err != nil {
+		return s.sendErrorAndEnd(c, "Failed to load schedulable accounts in this group")
+	}
+	for i := range accounts {
+		if !groupTestAccountSupportsModel(group.Platform, &accounts[i], modelID) {
+			continue
+		}
+		s.sendEvent(c, TestEvent{Type: "status", Status: "route_selected", Model: modelID})
+		return s.TestAccountConnection(c, accounts[i].ID, modelID, prompt, mode)
+	}
+
+	return s.sendErrorAndEnd(c, fmt.Sprintf("No schedulable account supports model %s", modelID))
+}
+
+func groupTestAccountMatchesPlatform(groupPlatform string, account *Account) bool {
+	if account == nil || !account.IsSchedulable() {
+		return false
+	}
+	if groupPlatform == PlatformComposite {
+		return isConcreteRequestPlatform(account.Platform)
+	}
+	if account.Platform == groupPlatform {
+		return true
+	}
+	return (groupPlatform == PlatformAnthropic || groupPlatform == PlatformGemini) && account.IsMixedSchedulingEnabled()
+}
+
+func groupTestAccountSupportsModel(groupPlatform string, account *Account, model string) bool {
+	if !groupTestAccountMatchesPlatform(groupPlatform, account) ||
+		!isConnectionTestTextModel(model) ||
+		!isConnectionTestTextModel(account.GetMappedModel(model)) ||
+		!account.IsModelSupported(model) {
+		return false
+	}
+	if groupPlatform != PlatformComposite || len(account.GetModelMapping()) > 0 {
+		return true
+	}
+
+	// 空映射通常表示“允许所有模型”，但在组合分组中会让 Anthropic 账号误认 OpenAI 模型。
+	// 没有显式映射时，将账号限制在自身平台的已知模型目录内。
+	for _, candidate := range defaultModelsListCandidateIDs(account.Platform) {
+		if candidate == model {
+			return true
+		}
+	}
+	return false
+}
+
+// 分组和 API Key 连接测试只允许文本模型。图片、视频和语音测试仍由管理员在账号页执行，
+// 避免普通用户把免计费的健康检查当作高成本多媒体请求入口。
+func isConnectionTestTextModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if model == "" {
+		return false
+	}
+	if IsGPTImageGenerationModel(model) || isGrokImageGenerationModel(model) ||
+		isGrokVideoGenerationModel(model) || isImageGenerationModel(model) {
+		return false
+	}
+	for _, marker := range []string{"video", "voice", "realtime", "tts", "speech", "audio"} {
+		if strings.Contains(model, marker) {
+			return false
+		}
+	}
+	return true
+}
+
 // testOpenCodeGoAccountConnection probes the native endpoint for the selected
 // model. Adaptive accounts (the default) follow OpenCodeGoModelProtocol:
 // grok/gpt/muse-spark → Responses, minimax/qwen → Anthropic, everything else

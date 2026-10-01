@@ -897,6 +897,7 @@ export default {
       deleteGroup: 'Delete Group',
       duplicate: 'Duplicate',
       duplicating: 'Duplicating',
+      testConnection: 'Test',
       duplicateSuccess: 'Group duplicated as "{name}" and disabled. Review its configuration before enabling it.',
       duplicateFailed: 'Failed to duplicate group',
       sortOrder: 'Sort',

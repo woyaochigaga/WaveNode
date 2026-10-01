@@ -216,6 +216,7 @@ export default {
     lastUsedAt: 'Last Used',
     lastUsedIP: 'Last Used IP',
     useKey: 'Use Key',
+    testConnection: 'Test',
     useKeyModal: {
       title: 'Use API Key',
       description:

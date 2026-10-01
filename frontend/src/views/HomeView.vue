@@ -23,7 +23,6 @@
           <span class="min-w-0 truncate text-base font-semibold">{{ siteName }}</span>
         </div>
         <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-          <LocaleSwitcher />
           <a
             v-if="docUrl"
             :href="docUrl"
@@ -78,8 +77,11 @@
       </div>
     </main>
 
-    <footer class="min-w-0 border-t border-gray-200 px-4 py-5 text-center text-sm text-gray-500 dark:border-dark-800 dark:text-dark-400">
-      &copy; {{ currentYear }} {{ siteName }}
+    <footer class="min-w-0 border-t border-gray-200 px-4 py-4 text-sm text-gray-500 dark:border-dark-800 dark:text-dark-400 sm:px-6">
+      <div class="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
+        <span>&copy; {{ currentYear }} {{ siteName }}</span>
+        <LocaleSwitcher placement="top" />
+      </div>
     </footer>
   </div>
 

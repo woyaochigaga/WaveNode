@@ -119,6 +119,12 @@ export async function getModelAllowlistCandidates(
   return data.models || []
 }
 
+/** 获取分组中当前有可调度账号支持的测试模型。 */
+export async function getTestModels(id: number): Promise<string[]> {
+  const { data } = await apiClient.get<{ models: string[] }>(`/admin/groups/${id}/test-models`)
+  return data.models
+}
+
 /**
  * Create new group
  * @param groupData - Group data
@@ -478,6 +484,7 @@ export const groupsAPI = {
   getLiveCapability,
   getById,
   getModelAllowlistCandidates,
+  getTestModels,
   create,
   duplicate,
   update,

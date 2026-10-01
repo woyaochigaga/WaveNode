@@ -45,6 +45,12 @@ export async function getById(id: number): Promise<ApiKey> {
   return data
 }
 
+/** 获取 API Key 所属分组当前可执行的测试模型。 */
+export async function getTestModels(id: number): Promise<string[]> {
+  const { data } = await apiClient.get<{ models: string[] }>(`/keys/${id}/test-models`)
+  return data.models
+}
+
 /**
  * Create new API key
  * @param name - Key name
@@ -160,6 +166,7 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
 export const keysAPI = {
   list,
   getById,
+  getTestModels,
   create,
   update,
   bulkUpdate,

@@ -52,6 +52,12 @@ describe('AppSidebar collapsible groups', () => {
 })
 
 describe('AppSidebar header styles', () => {
+  it('uses the complete brand area as a home link', () => {
+    expect(componentSource).toContain("const homePath = '/home'")
+    expect(componentSource).toContain('class="sidebar-home-link"')
+    expect(componentSource).toContain(':to="homePath"')
+  })
+
   it('does not clip the version badge dropdown', () => {
     const sidebarHeaderBlockMatch = styleSource.match(/\.sidebar-header\s*\{[\s\S]*?\n {2}\}/)
     const sidebarBrandBlockMatch = componentSource.match(/\.sidebar-brand\s*\{[\s\S]*?\n\}/)

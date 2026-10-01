@@ -392,6 +392,15 @@
 
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
+              <!-- API Key 连接测试入口 -->
+              <button
+                data-testid="key-test-connection"
+                @click="openConnectionTest(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              >
+                <Icon name="play" size="sm" />
+                <span class="text-xs">{{ t('keys.testConnection') }}</span>
+              </button>
               <!-- Use Key Button -->
               <button
                 @click="openUseKeyModal(row)"
@@ -1079,6 +1088,14 @@
       @close="closeUseKeyModal"
     />
 
+    <ConnectionTestModal
+      :show="showConnectionTest"
+      target-type="api-key"
+      :target-id="testingKey?.id ?? null"
+      :target-name="testingKey?.name ?? ''"
+      @close="closeConnectionTest"
+    />
+
     <!-- CCS Client Selection Dialog for Antigravity -->
     <BaseDialog
       :show="showCcsClientSelect"
@@ -1219,6 +1236,7 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
 	import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+	import ConnectionTestModal from '@/components/common/ConnectionTestModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1400,10 +1418,12 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
+const showConnectionTest = ref(false)
 const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
+const testingKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1663,6 +1683,16 @@ const loadPublicSettings = async () => {
 const openUseKeyModal = (key: ApiKey) => {
   selectedKey.value = key
   showUseKeyModal.value = true
+}
+
+const openConnectionTest = (key: ApiKey) => {
+  testingKey.value = key
+  showConnectionTest.value = true
+}
+
+const closeConnectionTest = () => {
+  showConnectionTest.value = false
+  testingKey.value = null
 }
 
 const closeUseKeyModal = () => {

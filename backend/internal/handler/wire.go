@@ -9,6 +9,26 @@ import (
 	"github.com/google/wire"
 )
 
+// ProvideAPIKeyHandler 为正式运行环境注入账户测试服务，不扩大独立测试使用的构造函数。
+func ProvideAPIKeyHandler(apiKeyService *service.APIKeyService, accountTestService *service.AccountTestService) *APIKeyHandler {
+	handler := NewAPIKeyHandler(apiKeyService)
+	handler.SetAccountTestService(accountTestService)
+	return handler
+}
+
+// ProvideAdminGroupHandler 为管理端分组处理器注入连接测试能力，并保留原构造函数。
+func ProvideAdminGroupHandler(
+	adminService service.AdminService,
+	dashboardService *service.DashboardService,
+	groupCapacityService *service.GroupCapacityService,
+	cfg *config.Config,
+	accountTestService *service.AccountTestService,
+) *admin.GroupHandler {
+	handler := admin.NewGroupHandlerWithConfig(adminService, dashboardService, groupCapacityService, cfg)
+	handler.SetAccountTestService(accountTestService)
+	return handler
+}
+
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
 	dashboardHandler *admin.DashboardHandler,
@@ -230,7 +250,7 @@ var ProviderSet = wire.NewSet(
 	// Top-level handlers
 	NewAuthHandler,
 	NewUserHandler,
-	NewAPIKeyHandler,
+	ProvideAPIKeyHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
 	NewSubscriptionHandler,
@@ -252,7 +272,7 @@ var ProviderSet = wire.NewSet(
 	// Admin handlers
 	admin.NewDashboardHandler,
 	admin.NewUserHandler,
-	admin.NewGroupHandlerWithConfig,
+	ProvideAdminGroupHandler,
 	admin.ProvideAccountHandler,
 	admin.NewAnnouncementHandler,
 	admin.NewDataManagementHandler,

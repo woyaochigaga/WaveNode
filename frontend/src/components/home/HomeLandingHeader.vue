@@ -10,7 +10,6 @@
       </div>
 
       <div class="flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-        <LocaleSwitcher />
         <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="flex h-10 w-10 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" :title="t('home.viewDocs')">
           <Icon name="book" size="md" />
         </a>
@@ -29,9 +28,14 @@
           :intensity="1.25"
           :shine-size="12"
           :shine-fade="34"
+          tint="#0f766e"
+          :tint-opacity="0.94"
+          line-color="#ccfbf1"
+          base-color="#2dd4bf"
+          text-color="#f0fdfa"
           class="header-dashboard-button group ml-1"
         >
-          <Icon :name="isAuthenticated ? 'grid' : 'login'" size="sm" class="text-primary-300" />
+          <Icon :name="isAuthenticated ? 'grid' : 'login'" size="sm" class="text-primary-100" />
           <span>{{ isAuthenticated ? t('home.dashboard') : t('home.login') }}</span>
           <Icon name="arrowRight" size="sm" class="transition-transform duration-300 group-hover:translate-x-1" />
         </SpecularButton>
@@ -44,7 +48,6 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
-import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SpecularButton from '@/components/ui/SpecularButton.vue'
 
 defineProps<{
@@ -141,7 +144,8 @@ onBeforeUnmount(() => {
 .header-dashboard-button {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 8px 20px rgba(2, 6, 23, 0.24);
+    0 9px 24px rgba(15, 118, 110, 0.2),
+    0 0 0 1px rgba(20, 184, 166, 0.12);
 }
 
 :global(.dark .landing-nav) {

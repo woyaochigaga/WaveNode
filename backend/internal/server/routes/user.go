@@ -77,6 +77,9 @@ func RegisterUserRoutes(
 		{
 			keys.GET("", h.APIKey.List)
 			keys.GET("/:id", h.APIKey.GetByID)
+			keys.GET("/:id/test-models", h.APIKey.GetTestModels)
+			// 连接测试会访问真实上游，叠加严格档限流，避免被当作免费请求入口滥用。
+			keys.POST("/:id/test", panelRateLimiter.Heavy(), h.APIKey.Test)
 			keys.POST("", h.APIKey.Create)
 			keys.PUT("/:id", h.APIKey.Update)
 			keys.DELETE("/:id", h.APIKey.Delete)

@@ -107,7 +107,11 @@ export default {
     cta: {
       title: 'Ready to Get Started?',
       description: 'Sign up now and get free trial credits to experience seamless AI access',
-      button: 'Sign Up Free'
+      button: 'Sign Up Free',
+      routeTitle: 'Intelligent Request Flow',
+      routeReady: 'Routing Ready',
+      endpoint: 'Unified Endpoint',
+      router: 'Smart Router'
     },
     footer: {
       allRightsReserved: 'All rights reserved.'

@@ -8,24 +8,28 @@
   >
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
-      <!-- Custom Logo or Default Logo -->
       <router-link
         :to="homePath"
-        class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
+        class="sidebar-home-link"
+        :aria-label="siteName"
         @click="handleMenuItemClick(homePath)"
+      />
+      <!-- Custom Logo or Default Logo -->
+      <div
+        class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow"
       >
         <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
-      </router-link>
+      </div>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-        <router-link
-          :to="homePath"
-          class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
-          @click="handleMenuItemClick(homePath)"
+        <span
+          class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors dark:text-white"
         >
           {{ siteName }}
-        </router-link>
+        </span>
         <!-- Version Badge -->
-        <VersionBadge :version="siteVersion" />
+        <div class="sidebar-version-control">
+          <VersionBadge :version="siteVersion" />
+        </div>
       </div>
     </div>
 
@@ -252,7 +256,7 @@ const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
-const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
+const homePath = '/home'
 
 // Per-group expand/collapse overrides. A group with no entry follows the
 // automatic behavior (expanded while the active route is one of its children);
@@ -976,9 +980,35 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.sidebar-header {
+  position: relative;
+}
+
+.sidebar-home-link {
+  position: absolute;
+  inset: 0.25rem;
+  z-index: 0;
+  border-radius: 0.75rem;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.sidebar-home-link:hover {
+  background: rgb(20 184 166 / 0.06);
+}
+
+.sidebar-home-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(20 184 166 / 0.55);
+}
+
 .sidebar-logo {
+  position: relative;
+  z-index: 1;
   flex: 0 0 2.25rem;
   min-width: 2.25rem;
+  pointer-events: none;
 }
 
 .sidebar-header-collapsed {
@@ -988,14 +1018,22 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-brand {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   flex: 1 1 auto;
   white-space: nowrap;
+  pointer-events: none;
   transition:
     max-width 0.22s ease,
     opacity 0.14s ease,
     transform 0.14s ease;
   max-width: 12rem;
+}
+
+.sidebar-version-control {
+  width: fit-content;
+  pointer-events: auto;
 }
 
 .sidebar-brand-collapsed {

@@ -37,6 +37,11 @@
               :intensity="1.3"
               :shine-size="12"
               :shine-fade="36"
+              tint="#0f766e"
+              :tint-opacity="0.94"
+              line-color="#ccfbf1"
+              base-color="#2dd4bf"
+              text-color="#f0fdfa"
               class="landing-specular-cta group"
             >
               <span>{{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}</span>
@@ -172,25 +177,15 @@
         </div>
       </section>
 
-      <section class="home-reveal relative mt-16 overflow-hidden rounded-3xl border border-primary-200/70 bg-white/65 px-6 py-9 text-center shadow-lg shadow-primary-900/[0.04] backdrop-blur-xl dark:border-primary-900/70 dark:bg-[#050811]/95 sm:mt-24 sm:px-10 sm:py-12" data-reveal style="--reveal-delay: 80ms">
-        <div class="cta-glow" aria-hidden="true"></div>
-        <div class="relative">
-          <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ siteName }}</h2>
-          <p class="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-600 dark:text-dark-300 sm:text-base">{{ siteSubtitle }}</p>
-          <SpecularButton
-            :to="isAuthenticated ? dashboardPath : '/login'"
-            size="lg"
-            :radius="14"
-            :intensity="1.3"
-            :shine-size="12"
-            :shine-fade="36"
-            class="landing-specular-cta group mt-6"
-          >
-            <span>{{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}</span>
-            <Icon name="arrowRight" size="md" class="transition-transform duration-300 group-hover:translate-x-1" />
-          </SpecularButton>
-        </div>
-      </section>
+      <HomeLandingCta
+        class="home-reveal mt-16 sm:mt-24"
+        data-reveal
+        style="--reveal-delay: 80ms"
+        :site-name="siteName"
+        :site-subtitle="siteSubtitle"
+        :is-authenticated="isAuthenticated"
+        :dashboard-path="dashboardPath"
+      />
     </div>
   </main>
 </template>
@@ -201,6 +196,7 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import CircularGallery from '@/components/ui/CircularGallery.vue'
 import SpecularButton from '@/components/ui/SpecularButton.vue'
+import HomeLandingCta from '@/components/home/HomeLandingCta.vue'
 
 defineProps<{
   siteName: string
@@ -770,7 +766,12 @@ onBeforeUnmount(() => {
 .home-provider:hover::before { opacity: 1; }
 .home-reveal { opacity: 0; transform: translateY(1.2rem); transition: opacity 650ms ease var(--reveal-delay, 0ms), transform 650ms cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms); }
 .home-reveal.is-visible { opacity: 1; transform: translateY(0); }
-.cta-glow { position: absolute; inset: -70% 15% auto; height: 15rem; border-radius: 50%; background: rgba(45, 212, 191, 0.15); filter: blur(65px); pointer-events: none; }
+.landing-specular-cta {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 14px 34px rgba(15, 118, 110, 0.2),
+    0 0 0 1px rgba(20, 184, 166, 0.12);
+}
 
 @keyframes aurora-drift {
   from { transform: translate3d(-2%, -1%, 0) rotate(-2deg) scale(0.96); }

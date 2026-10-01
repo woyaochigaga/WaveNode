@@ -382,6 +382,14 @@
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
               <button
+                data-testid="group-test-connection"
+                @click="openConnectionTest(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              >
+                <Icon name="play" size="sm" />
+                <span class="text-xs">{{ t("admin.groups.testConnection") }}</span>
+              </button>
+              <button
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -4261,6 +4269,14 @@
       @close="showRPMOverridesModal = false"
       @success="loadGroups"
     />
+
+    <ConnectionTestModal
+      :show="showConnectionTest"
+      target-type="group"
+      :target-id="testingGroup?.id ?? null"
+      :target-name="testingGroup?.name ?? ''"
+      @close="closeConnectionTest"
+    />
   </AppLayout>
 </template>
 
@@ -4301,6 +4317,7 @@ import Icon from "@/components/icons/Icon.vue";
 import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
+import ConnectionTestModal from "@/components/common/ConnectionTestModal.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
 import CodexManifestAccountsField from "@/components/admin/group/CodexManifestAccountsField.vue";
 import PricingEntryCard from "@/components/admin/channel/PricingEntryCard.vue";
@@ -4842,6 +4859,8 @@ const showRateMultipliersModal = ref(false);
 const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
+const showConnectionTest = ref(false);
+const testingGroup = ref<AdminGroup | null>(null);
 const sortableGroups = ref<AdminGroup[]>([]);
 type ConcreteGroupPlatform = Exclude<GroupPlatform, "composite">;
 type CompositeRouteFormState = {
@@ -6416,6 +6435,16 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
 const handleRateMultipliers = (group: AdminGroup) => {
   rateMultipliersGroup.value = group;
   showRateMultipliersModal.value = true;
+};
+
+const openConnectionTest = (group: AdminGroup) => {
+  testingGroup.value = group;
+  showConnectionTest.value = true;
+};
+
+const closeConnectionTest = () => {
+  showConnectionTest.value = false;
+  testingGroup.value = null;
 };
 
 const handleRPMOverrides = (group: AdminGroup) => {

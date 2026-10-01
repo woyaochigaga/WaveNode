@@ -894,6 +894,7 @@ export default {
       deleteGroup: '删除分组',
       duplicate: '复制',
       duplicating: '复制中',
+      testConnection: '测试',
       duplicateSuccess: '分组已复制为「{name}」，已默认停用，请确认配置后再启用',
       duplicateFailed: '复制分组失败',
       sortOrder: '排序',

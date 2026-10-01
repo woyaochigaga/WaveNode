@@ -25,6 +25,7 @@ type GroupHandler struct {
 	adminService         service.AdminService
 	dashboardService     *service.DashboardService
 	groupCapacityService *service.GroupCapacityService
+	accountTestService   *service.AccountTestService
 	cfg                  *config.Config
 }
 
@@ -101,6 +102,13 @@ func NewGroupHandlerWithConfig(adminService service.AdminService, dashboardServi
 		dashboardService:     dashboardService,
 		groupCapacityService: groupCapacityService,
 		cfg:                  cfg,
+	}
+}
+
+// SetAccountTestService 注入分组连接测试能力，同时保留原构造函数供独立测试使用。
+func (h *GroupHandler) SetAccountTestService(accountTestService *service.AccountTestService) {
+	if h != nil {
+		h.accountTestService = accountTestService
 	}
 }
 
@@ -628,6 +636,68 @@ func (h *GroupHandler) GetGroupModelAllowlistCandidates(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"models": models})
+}
+
+// GetTestModels 返回当前至少有一个可调度账号支持的测试模型。
+// GET /api/v1/admin/groups/:id/test-models
+func (h *GroupHandler) GetTestModels(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || groupID <= 0 {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "Group test service is unavailable")
+		return
+	}
+
+	group, err := h.adminService.GetGroup(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if !group.IsActive() {
+		response.ErrorFrom(c, infraerrors.BadRequest("GROUP_TEST_DISABLED", "Enable this group before testing its connection"))
+		return
+	}
+	models, err := h.accountTestService.GetGroupTestModels(c.Request.Context(), group)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"models": models})
+}
+
+type groupConnectionTestRequest struct {
+	ModelID string `json:"model_id"`
+}
+
+// Test 通过分组中的可调度账号执行免计费连接探测，并复用账户测试的 SSE 协议。
+// POST /api/v1/admin/groups/:id/test
+func (h *GroupHandler) Test(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || groupID <= 0 {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "Group test service is unavailable")
+		return
+	}
+
+	group, err := h.adminService.GetGroup(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if !group.IsActive() {
+		response.ErrorFrom(c, infraerrors.BadRequest("GROUP_TEST_DISABLED", "Enable this group before testing its connection"))
+		return
+	}
+
+	var req groupConnectionTestRequest
+	_ = c.ShouldBindJSON(&req)
+	_ = h.accountTestService.TestGroupConnection(c, group, req.ModelID, "", "")
 }
 
 // Create handles creating a new group

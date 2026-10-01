@@ -107,7 +107,11 @@ export default {
     cta: {
       title: '准备好开始了吗？',
       description: '注册即可获得免费试用额度，体验一站式 AI 服务',
-      button: '免费注册'
+      button: '免费注册',
+      routeTitle: '智能请求链路',
+      routeReady: '路由已就绪',
+      endpoint: '统一接口',
+      router: '智能路由'
     },
     footer: {
       allRightsReserved: '保留所有权利。'
