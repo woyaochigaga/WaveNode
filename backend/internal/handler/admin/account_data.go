@@ -222,7 +222,17 @@ func (h *AccountHandler) ExportData(c *gin.Context) {
 		SkippedShadows: skippedShadows,
 	}
 
+	setSensitiveResponseHeaders(c)
 	response.Success(c, payload)
+}
+
+// setSensitiveResponseHeaders 禁止浏览器、代理和中间缓存保存含明文凭证或短时令牌的响应。
+// 同步响应没有服务端下载链接生命周期，因此 no-store 即为这条链路的最短有效期。
+func setSensitiveResponseHeaders(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store, max-age=0")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+	c.Header("X-Content-Type-Options", "nosniff")
 }
 
 func (h *AccountHandler) ImportData(c *gin.Context) {

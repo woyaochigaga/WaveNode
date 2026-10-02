@@ -62,6 +62,41 @@ func TestRedactAuditBody_JSONRedactsSecrets(t *testing.T) {
 	}
 }
 
+func TestSensitiveLeakageCanaryIsRedactedAtAuditQueueBoundary(t *testing.T) {
+	const canary = "sub2api-canary-secret-audit"
+	service := NewAuditLogService(nil, nil)
+	defer service.Stop()
+
+	entry := &AuditLog{
+		UserAgent:   "Cookie: session=" + canary,
+		RequestBody: `{"rawPrompt":"` + canary + `"}`,
+		Extra: map[string]any{
+			"authorization": "Bearer " + canary,
+			"nested":        map[string]any{"proxy_password": canary},
+		},
+	}
+	service.Record(entry)
+
+	queued := <-service.queue
+	encoded := string(mustMarshalAuditTest(t, queued))
+	if strings.Contains(encoded, canary) {
+		t.Fatalf("审计入队记录泄漏完整 canary: %s", encoded)
+	}
+	// Record 使用安全副本，不能悄悄修改调用方仍可能使用的业务对象。
+	if entry.Extra["authorization"] != "Bearer "+canary {
+		t.Fatalf("Record 不应修改原始审计对象: %#v", entry.Extra)
+	}
+}
+
+func mustMarshalAuditTest(t *testing.T, value any) []byte {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal audit test value: %v", err)
+	}
+	return encoded
+}
+
 // 裸键 "session"（Ollama Cloud 会话保存的请求体字段）值整体就是浏览器 Cookie 明文，
 // 必须命中键级脱敏；session_id 等运行态标识不受影响，保留以便追责。
 func TestRedactAuditBody_BareSessionKeyRedacted(t *testing.T) {

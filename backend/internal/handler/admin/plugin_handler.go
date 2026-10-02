@@ -138,6 +138,7 @@ func (h *PluginHandler) GetConfig(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	setSensitiveResponseHeaders(c)
 	c.Data(http.StatusOK, "application/json; charset=utf-8", configJSON)
 }
 
@@ -167,6 +168,7 @@ func (h *PluginHandler) SaveConfig(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	setSensitiveResponseHeaders(c)
 	c.Data(http.StatusOK, "application/json; charset=utf-8", saved)
 }
 
@@ -214,6 +216,7 @@ func (h *PluginHandler) CreateUISession(c *gin.Context) {
 		response.InternalError(c, "创建插件 UI Bridge 失败")
 		return
 	}
+	setSensitiveResponseHeaders(c)
 	response.Success(c, gin.H{
 		"url":               fmt.Sprintf("/api/v1/plugin-ui/%s/index.html#bridge_token=%s", assetToken, bridgeToken),
 		"bridge_token":      bridgeToken,

@@ -33,6 +33,11 @@ func TestDeriveAuditAction(t *testing.T) {
 	}
 }
 
+func TestSensitiveExportsRemainInAuditAllowlist(t *testing.T) {
+	require.Equal(t, "admin.accounts.export", auditSensitiveReads["GET /api/v1/admin/accounts/data"])
+	require.Equal(t, "admin.proxies.export", auditSensitiveReads["GET /api/v1/admin/proxies/data"])
+}
+
 type auditCaptureRepository struct {
 	mu   sync.Mutex
 	logs []*service.AuditLog

@@ -9,6 +9,7 @@ const {
   enablePlugin,
   savePluginConfig,
   createUISession,
+  getPluginConfig,
   stepUpRun,
 } = vi.hoisted(() => ({
   listPlugins: vi.fn(),
@@ -16,6 +17,7 @@ const {
   enablePlugin: vi.fn(),
   savePluginConfig: vi.fn(),
   createUISession: vi.fn(),
+  getPluginConfig: vi.fn(),
   stepUpRun: vi.fn((action: () => Promise<unknown>) => action()),
 }))
 
@@ -27,7 +29,7 @@ vi.mock('@/api/admin', () => ({
       enable: enablePlugin,
       disable: vi.fn(),
       remove: vi.fn(),
-      getConfig: vi.fn().mockResolvedValue({}),
+      getConfig: getPluginConfig,
       saveConfig: savePluginConfig,
       test: vi.fn().mockResolvedValue({ success: true, message: 'ok', latency_ms: 1 }),
       createUISession,
@@ -130,6 +132,7 @@ describe('管理员插件页二次验证', () => {
     uploadPlugin.mockResolvedValue(plugin)
     enablePlugin.mockResolvedValue(plugin)
     savePluginConfig.mockResolvedValue({ enabled: true })
+    getPluginConfig.mockResolvedValue({ endpoint: 'https://plugin.example.test' })
     createUISession.mockResolvedValue({
       url: '/api/v1/plugin-ui/token/index.html#bridge_token=bridge',
       bridge_token: 'bridge',
@@ -165,5 +168,72 @@ describe('管理员插件页二次验证', () => {
 
     expect(stepUpRun).toHaveBeenCalledTimes(1)
     expect(uploadPlugin).toHaveBeenCalledTimes(1)
+  })
+
+  it('UI Bridge 只响应通过来源、令牌和消息类型白名单的请求', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const configure = wrapper
+      .findAll('button')
+      .find((item) => item.text().includes('admin.plugins.configure'))
+    expect(configure).toBeDefined()
+    await configure!.trigger('click')
+    await flushPromises()
+
+    const frame = wrapper.get('iframe').element as HTMLIFrameElement
+    // happy-dom 不会为 iframe 创建浏览上下文，注入最小伪窗口以验证来源绑定。
+    const postMessage = vi.fn()
+    const frameWindow = { postMessage } as unknown as Window
+    Object.defineProperty(frame, 'contentWindow', {
+      configurable: true,
+      value: frameWindow,
+    })
+    const dispatchBridgeMessage = (data: Record<string, unknown>) => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: frameWindow,
+          origin: 'null',
+          data,
+        }),
+      )
+    }
+
+    dispatchBridgeMessage({
+      source: 'sub2api-plugin-ui',
+      bridge_token: 'wrong-token',
+      type: 'config.load',
+      request_id: 'rejected-token',
+    })
+    dispatchBridgeMessage({
+      source: 'sub2api-plugin-ui',
+      bridge_token: 'bridge',
+      type: 'config.dump',
+      request_id: 'rejected-type',
+    })
+    await flushPromises()
+    expect(getPluginConfig).not.toHaveBeenCalled()
+    expect(postMessage).not.toHaveBeenCalled()
+
+    dispatchBridgeMessage({
+      source: 'sub2api-plugin-ui',
+      bridge_token: 'bridge',
+      type: 'config.load',
+      request_id: 'allowed-load',
+    })
+    await flushPromises()
+
+    expect(getPluginConfig).toHaveBeenCalledWith(7)
+    expect(postMessage).toHaveBeenCalledTimes(1)
+    const [message, targetOrigin] = postMessage.mock.calls[0]
+    expect(targetOrigin).toBe('*')
+    expect(message).toEqual({
+      source: 'sub2api-plugin-host',
+      bridge_token: 'bridge',
+      type: 'config.load.result',
+      request_id: 'allowed-load',
+      ok: true,
+      config: { endpoint: 'https://plugin.example.test' },
+    })
   })
 })

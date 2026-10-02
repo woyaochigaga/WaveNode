@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 )
 
 const (
@@ -72,8 +74,9 @@ func (s *AuditLogService) Record(entry *AuditLog) {
 	if s == nil || entry == nil {
 		return
 	}
-	if entry.CreatedAt.IsZero() {
-		entry.CreatedAt = time.Now().UTC()
+	safeEntry := redactAuditLogEntry(entry)
+	if safeEntry.CreatedAt.IsZero() {
+		safeEntry.CreatedAt = time.Now().UTC()
 	}
 	select {
 	case <-s.ctx.Done():
@@ -81,7 +84,7 @@ func (s *AuditLogService) Record(entry *AuditLog) {
 	default:
 	}
 	select {
-	case s.queue <- entry:
+	case s.queue <- safeEntry:
 	default:
 		atomic.AddUint64(&s.droppedCount, 1)
 	}
@@ -111,20 +114,37 @@ func (s *AuditLogService) ClearAll(ctx context.Context, trace *AuditLog) (int64,
 	}
 
 	if trace != nil {
-		trace.Action = AuditActionAuditLogClear
-		if trace.CreatedAt.IsZero() {
-			trace.CreatedAt = time.Now().UTC()
+		safeTrace := redactAuditLogEntry(trace)
+		safeTrace.Action = AuditActionAuditLogClear
+		if safeTrace.CreatedAt.IsZero() {
+			safeTrace.CreatedAt = time.Now().UTC()
 		}
-		if trace.Extra == nil {
-			trace.Extra = map[string]any{}
+		if safeTrace.Extra == nil {
+			safeTrace.Extra = map[string]any{}
 		}
-		trace.Extra["deleted_rows"] = deleted
-		if err := s.repo.Insert(ctx, trace); err != nil {
+		safeTrace.Extra["deleted_rows"] = deleted
+		if err := s.repo.Insert(ctx, safeTrace); err != nil {
 			// 留痕失败必须显式暴露：清空已发生，但审计链断裂。
 			return deleted, fmt.Errorf("audit logs cleared (%d rows) but failed to persist clear-trace record: %w", deleted, err)
 		}
 	}
 	return deleted, nil
+}
+
+// redactAuditLogEntry 在持久化边界创建安全副本，兜住绕过 HTTP 审计中间件的内部调用。
+// 原对象保持不变，避免异步入队后调用方继续修改同一份 map 造成数据竞争。
+func redactAuditLogEntry(entry *AuditLog) *AuditLog {
+	if entry == nil {
+		return nil
+	}
+	safe := *entry
+	safe.UserAgent = logredact.RedactText(entry.UserAgent)
+	safe.CredentialMasked = logredact.RedactText(entry.CredentialMasked)
+	safe.RequestBody = logredact.RedactText(entry.RequestBody)
+	if entry.Extra != nil {
+		safe.Extra = logredact.RedactMap(entry.Extra)
+	}
+	return &safe
 }
 
 func (s *AuditLogService) runWriter() {

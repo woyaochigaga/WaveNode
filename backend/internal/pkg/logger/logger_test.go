@@ -3,10 +3,15 @@ package logger
 import (
 	"encoding/json"
 	"io"
+	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+
+	"go.uber.org/zap"
 )
 
 func TestInit_DualOutput(t *testing.T) {
@@ -198,5 +203,86 @@ func TestInit_CallerShouldPointToCallsite(t *testing.T) {
 	caller, _ := payload["caller"].(string)
 	if !strings.Contains(caller, "logger_test.go:") {
 		t.Fatalf("caller should point to this test file, got: %s", caller)
+	}
+}
+
+type captureSink struct {
+	mu     sync.Mutex
+	events []*LogEvent
+}
+
+func (s *captureSink) WriteLogEvent(event *LogEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	copyEvent := *event
+	copyEvent.Fields = make(map[string]any, len(event.Fields))
+	for key, value := range event.Fields {
+		copyEvent.Fields[key] = value
+	}
+	s.events = append(s.events, &copyEvent)
+}
+
+func (s *captureSink) JSON(t *testing.T) string {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	encoded, err := json.Marshal(s.events)
+	if err != nil {
+		t.Fatalf("marshal captured log events: %v", err)
+	}
+	return string(encoded)
+}
+
+func TestSensitiveLeakageCanaryIsRedactedAcrossLoggerOutputs(t *testing.T) {
+	const canary = "sub2api-canary-secret-logger"
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "sub2api.log")
+	sink := &captureSink{}
+	SetSink(sink)
+	t.Cleanup(func() { SetSink(nil) })
+
+	err := Init(InitOptions{
+		Level:       "debug",
+		Format:      "json",
+		ServiceName: "sub2api",
+		Environment: "test",
+		Output: OutputOptions{
+			ToStdout: false,
+			ToFile:   true,
+			FilePath: logPath,
+		},
+		Rotation: RotationOptions{MaxSizeMB: 10, MaxBackups: 1, MaxAgeDays: 1},
+		Sampling: SamplingOptions{Enabled: false},
+	})
+	if err != nil {
+		t.Fatalf("Init() error: %v", err)
+	}
+
+	L().Error(
+		"upstream failed Authorization: Bearer "+canary,
+		zap.String("refresh_token", canary),
+		zap.Any("payload", map[string]any{"proxyPassword": canary}),
+		zap.Any("typed_payload", struct {
+			AccessToken string `json:"accessToken"`
+		}{AccessToken: canary}),
+	)
+	log.Printf("Cookie: session=%s", canary)
+	slog.Warn("proxy check", "proxy_url", "http://worker:"+canary+"@127.0.0.1:8080")
+	WriteSinkEvent("warn", "security", "raw_prompt="+canary, map[string]any{"private_key": canary})
+	Sync()
+
+	fileBytes, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read log file: %v", err)
+	}
+	fileOutput := string(fileBytes)
+	sinkOutput := sink.JSON(t)
+	for name, output := range map[string]string{"file": fileOutput, "sink": sinkOutput} {
+		if strings.Contains(output, canary) {
+			t.Fatalf("%s 日志泄漏完整 canary: %s", name, output)
+		}
+		if !strings.Contains(output, "***") {
+			t.Fatalf("%s 日志缺少脱敏标记: %s", name, output)
+		}
 	}
 }

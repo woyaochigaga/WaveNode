@@ -88,6 +88,7 @@ func (h *ProxyHandler) ExportData(c *gin.Context) {
 		Accounts:   []DataAccount{},
 	}
 
+	setSensitiveResponseHeaders(c)
 	response.Success(c, payload)
 }
 

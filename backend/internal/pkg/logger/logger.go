@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -159,15 +160,12 @@ func WriteSinkEvent(level, component, message string, fields map[string]any) {
 		level = "info"
 	}
 	component = strings.TrimSpace(component)
-	message = strings.TrimSpace(message)
+	message = logredact.RedactText(strings.TrimSpace(message))
 	if message == "" {
 		return
 	}
 
-	eventFields := make(map[string]any, len(fields)+1)
-	for k, v := range fields {
-		eventFields[k] = v
-	}
+	eventFields := logredact.RedactMap(fields)
 	if component != "" {
 		if _, ok := eventFields["component"]; !ok {
 			eventFields["component"] = component
@@ -277,8 +275,8 @@ func buildLogger(options InitOptions) (*zap.Logger, zap.AtomicLevel, error) {
 		errPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 			return lvl >= atomic.Level() && lvl >= zapcore.WarnLevel
 		})
-		cores = append(cores, zapcore.NewCore(enc, zapcore.Lock(os.Stdout), infoPriority))
-		cores = append(cores, zapcore.NewCore(enc, zapcore.Lock(os.Stderr), errPriority))
+		cores = append(cores, newRedactingCore(zapcore.NewCore(enc, zapcore.Lock(os.Stdout), infoPriority)))
+		cores = append(cores, newRedactingCore(zapcore.NewCore(enc, zapcore.Lock(os.Stderr), errPriority)))
 	}
 
 	if options.Output.ToFile {
@@ -290,12 +288,12 @@ func buildLogger(options InitOptions) (*zap.Logger, zap.AtomicLevel, error) {
 				fileErr,
 			)
 		} else {
-			cores = append(cores, fileCore)
+			cores = append(cores, newRedactingCore(fileCore))
 		}
 	}
 
 	if len(cores) == 0 {
-		cores = append(cores, zapcore.NewCore(enc, zapcore.Lock(os.Stdout), atomic))
+		cores = append(cores, newRedactingCore(zapcore.NewCore(enc, zapcore.Lock(os.Stdout), atomic)))
 	}
 
 	core := zapcore.NewTee(cores...)
@@ -399,9 +397,9 @@ func (s *sinkCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 		Time:       entry.Time,
 		Level:      strings.ToLower(entry.Level.String()),
 		Component:  entry.LoggerName,
-		Message:    entry.Message,
+		Message:    logredact.RedactText(entry.Message),
 		LoggerName: entry.LoggerName,
-		Fields:     enc.Fields,
+		Fields:     logredact.RedactMap(enc.Fields),
 	}
 	sink.WriteLogEvent(event)
 	return nil
