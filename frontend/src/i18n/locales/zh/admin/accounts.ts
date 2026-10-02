@@ -291,6 +291,7 @@ export default {
       testConnection: '测试连接',
       reAuthorize: '重新授权',
       refreshToken: '刷新令牌',
+      refreshingToken: '正在刷新令牌…',
       noAccountsYet: '暂无账号',
       createFirstAccount: '添加 AI 平台账号以开始使用 API 网关。',
       tokenRefreshed: 'Token 刷新成功',
@@ -635,7 +636,19 @@ export default {
         probeUpstreamBilling: '探测上游倍率',
         resetStatusSuccess: '已成功重置 {count} 个账号状态',
         refreshTokenSuccess: '已成功刷新 {count} 个账号令牌',
+        refreshPartialSuccess: '刷新完成：{success} 个成功，{failed} 个失败。首个失败原因：{reason}',
         partialSuccess: '操作部分完成：{success} 成功，{failed} 失败'
+      },
+      refreshErrors: {
+        ACCOUNT_NOT_FOUND: '账号不存在或已被删除',
+        ACCOUNT_REFRESH_IN_PROGRESS: '该账号正在刷新，请稍后再试',
+        ACCOUNT_REFRESH_COORDINATION_UNAVAILABLE: '刷新协调服务暂时不可用，请稍后再试',
+        ACCOUNT_REFRESH_STATE_CHANGED: '账号凭据刚刚发生变化，请刷新列表后重试',
+        ACCOUNT_REFRESH_PERSIST_FAILED: '新凭据未能安全保存，原凭据未被覆盖',
+        ACCOUNT_REFRESH_UPSTREAM_FAILED: '上游授权服务刷新失败，请检查账号状态后重试',
+        ACCOUNT_REFRESH_UNSUPPORTED: '该账号类型不支持自动刷新',
+        SPARK_SHADOW_NO_REFRESH: '影子账号由母账号统一管理，无需单独刷新',
+        unknown: '刷新失败，请稍后重试',
       },
       bulkEdit: {
         title: '批量编辑账号',

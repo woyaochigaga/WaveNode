@@ -197,24 +197,13 @@ func (h *GrokOAuthHandler) RefreshAccountToken(c *gin.Context) {
 		response.BadRequest(c, "Cannot refresh non-OAuth account credentials")
 		return
 	}
-	tokenInfo, err := h.grokOAuthService.RefreshAccountToken(c.Request.Context(), account)
+	// 与通用账号入口共用刷新协调器，防止两个路由并发消费同一 refresh token。
+	result, err := h.adminService.RefreshAccountCredentials(c.Request.Context(), accountID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	newCredentials := h.grokOAuthService.BuildAccountCredentials(tokenInfo)
-	newCredentials = service.MergeCredentials(account.Credentials, newCredentials)
-	if baseURL := strings.TrimSpace(account.GetCredential("base_url")); baseURL != "" {
-		newCredentials["base_url"] = baseURL
-	}
-	updatedAccount, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, &service.UpdateAccountInput{
-		Credentials: newCredentials,
-	})
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, dto.AccountFromService(updatedAccount))
+	response.Success(c, dto.AccountFromService(result.Account))
 }
 
 type GrokOAuthReconcileRequest struct {

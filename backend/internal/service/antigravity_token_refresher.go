@@ -86,9 +86,16 @@ func clearAntigravityForceTokenRefreshExtra() map[string]any {
 
 // Refresh 执行 token 刷新
 func (r *AntigravityTokenRefresher) Refresh(ctx context.Context, account *Account) (map[string]any, error) {
+	credentials, _, err := r.RefreshWithOutcome(ctx, account)
+	return credentials, err
+}
+
+// RefreshWithOutcome 在 token 已刷新但 project_id 暂时无法获取时返回非致命警告，
+// 供管理员手动刷新入口准确提示；后台刷新仍通过 Refresh 保持原接口。
+func (r *AntigravityTokenRefresher) RefreshWithOutcome(ctx context.Context, account *Account) (map[string]any, string, error) {
 	tokenInfo, err := r.antigravityOAuthService.RefreshAccountToken(ctx, account)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	newCredentials := r.antigravityOAuthService.BuildAccountCredentials(tokenInfo)
@@ -114,7 +121,8 @@ func (r *AntigravityTokenRefresher) Refresh(ctx context.Context, account *Accoun
 			// 从未获取过 project_id，本次也失败，但不返回错误以允许下次重试
 			log.Printf("[AntigravityTokenRefresher] Account %d: LoadCodeAssist 失败，project_id 缺失，但 token 已更新，将在下次刷新时重试", account.ID)
 		}
+		return newCredentials, "missing_project_id_temporary", nil
 	}
 
-	return newCredentials, nil
+	return newCredentials, "", nil
 }

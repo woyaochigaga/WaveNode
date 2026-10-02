@@ -803,7 +803,7 @@ export interface BatchOperationResult {
   failed: number
   success_ids?: number[]
   failed_ids?: number[]
-  errors?: Array<{ account_id: number; error: string }>
+  errors?: Array<{ account_id: number; error: string; error_code?: string }>
   warnings?: Array<{ account_id: number; warning: string }>
 }
 

@@ -456,7 +456,23 @@
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
-    <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
+    <AccountActionMenu
+      :show="menu.show"
+      :account="menu.acc"
+      :anchor-rect="menu.anchorRect"
+      :refreshing="Boolean(menu.acc && refreshingAccountIds.has(menu.acc.id))"
+      @close="menu.show = false"
+      @test="handleTest"
+      @stats="handleViewStats"
+      @schedule="handleSchedule"
+      @duplicate="handleDuplicateAccount"
+      @reauth="handleReAuth"
+      @refresh-token="handleRefresh"
+      @recover-state="handleRecoverState"
+      @reset-quota="handleResetQuota"
+      @set-privacy="handleSetPrivacy"
+      @create-spark-shadow="handleCreateSparkShadow"
+    />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
     <ImportDataModal :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
@@ -528,7 +544,7 @@ import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
@@ -1895,7 +1911,20 @@ const handleBulkRefreshToken = async () => {
   try {
     const result = await adminAPI.accounts.batchRefresh(accountIds)
     if (result.failed > 0) {
-      appStore.showError(t('admin.accounts.bulkActions.partialSuccess', { success: result.success, failed: result.failed }))
+      const firstError = result.errors?.[0]
+      const failureReason = firstError
+        ? extractI18nErrorMessage(
+            { reason: firstError.error_code, message: firstError.error },
+            t,
+            'admin.accounts.refreshErrors',
+            firstError.error,
+          )
+        : t('admin.accounts.refreshErrors.unknown')
+      appStore.showError(t('admin.accounts.bulkActions.refreshPartialSuccess', {
+        success: result.success,
+        failed: result.failed,
+        reason: failureReason,
+      }))
       const failedIds = result.errors?.map(error => error.account_id) ?? []
       setSelectedIds(failedIds.length > 0 ? failedIds : accountIds)
     } else {
@@ -1905,7 +1934,12 @@ const handleBulkRefreshToken = async () => {
     reload()
   } catch (error) {
     console.error('Failed to bulk refresh token:', error)
-    appStore.showError(String(error))
+    appStore.showError(extractI18nErrorMessage(
+      error,
+      t,
+      'admin.accounts.refreshErrors',
+      t('admin.accounts.refreshErrors.unknown'),
+    ))
   }
 }
 const handleBulkProbeUpstreamBilling = async () => {
@@ -2336,6 +2370,8 @@ const handleSchedule = async (a: Account) => {
 const closeSchedulePanel = () => { showSchedulePanel.value = false; scheduleAcc.value = null; scheduleModelOptions.value = [] }
 const handleReAuth = (a: Account) => { reAuthAcc.value = a; showReAuth.value = true }
 const duplicatingAccountIDs = new Set<number>()
+// 记录正在刷新的账号，阻止快速重复点击触发多次上游换票。
+const refreshingAccountIds = ref(new Set<number>())
 const handleDuplicateAccount = async (a: Account) => {
   if (duplicatingAccountIDs.has(a.id)) return
   duplicatingAccountIDs.add(a.id)
@@ -2351,13 +2387,29 @@ const handleDuplicateAccount = async (a: Account) => {
   }
 }
 const handleRefresh = async (a: Account) => {
+  if (refreshingAccountIds.value.has(a.id)) return
+  refreshingAccountIds.value = new Set(refreshingAccountIds.value).add(a.id)
   try {
     const result = await adminAPI.accounts.refreshCredentials(a.id)
     patchAccountInList(result.account)
     enterAutoRefreshSilentWindow()
-    if (result.warning) appStore.showWarning(result.message)
+    if (result.warning) {
+      appStore.showWarning(result.message)
+    } else {
+      appStore.showSuccess(t('admin.accounts.tokenRefreshed'))
+    }
   } catch (error) {
     console.error('Failed to refresh credentials:', error)
+    appStore.showError(extractI18nErrorMessage(
+      error,
+      t,
+      'admin.accounts.refreshErrors',
+      t('admin.accounts.refreshErrors.unknown'),
+    ))
+  } finally {
+    const nextRefreshingIds = new Set(refreshingAccountIds.value)
+    nextRefreshingIds.delete(a.id)
+    refreshingAccountIds.value = nextRefreshingIds
   }
 }
 const handleRecoverState = async (a: Account) => {

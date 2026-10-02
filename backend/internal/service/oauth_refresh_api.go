@@ -8,7 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // OAuthRefreshExecutor 各平台实现的 OAuth 刷新执行器
@@ -34,6 +37,25 @@ type GrokOAuthRefreshSuccessRepository interface {
 	) (bool, error)
 }
 
+// OAuthCredentialsCASRepository prevents a completed provider refresh from
+// overwriting credentials or proxy configuration changed while the upstream
+// request was in flight.
+type OAuthCredentialsCASRepository interface {
+	UpdateOAuthCredentialsIfUnchanged(
+		ctx context.Context,
+		id int64,
+		expectedCredentials map[string]any,
+		expectedProxyID *int64,
+		credentials map[string]any,
+	) (bool, error)
+}
+
+// OAuthRefreshOutcomeExecutor is an optional extension for providers that need
+// to return a non-fatal operator warning in addition to refreshed credentials.
+type OAuthRefreshOutcomeExecutor interface {
+	RefreshWithOutcome(ctx context.Context, account *Account) (credentials map[string]any, warning string, err error)
+}
+
 const (
 	defaultRefreshLockTTL                   = 60 * time.Second
 	defaultRefreshLockReleaseTimeout        = 2 * time.Second
@@ -44,6 +66,8 @@ var (
 	errOAuthRefreshAccountRereadFailed = errors.New("oauth refresh account reread failed")
 	errOAuthRefreshAccountStateChanged = errors.New("oauth refresh account state changed")
 	errOAuthRefreshCredentialPersist   = errors.New("oauth refresh credential persistence failed")
+	errOAuthRefreshLeaseUnavailable    = errors.New("oauth refresh distributed lease unavailable")
+	errOAuthRefreshLeaseLost           = errors.New("oauth refresh distributed lease lost")
 )
 
 type oauthRefreshRequestPathKey struct{}
@@ -107,6 +131,7 @@ type OAuthRefreshResult struct {
 	NewCredentials map[string]any // 刷新后的 credentials（nil 表示未刷新）
 	Account        *Account       // 成功时为最新 account；刷新错误时为实际尝试的凭据快照
 	LockHeld       bool           // 锁被其他 worker 持有（未执行刷新）
+	Warning        string         // 非致命警告，例如 Antigravity 暂时缺少 project_id
 }
 
 func snapshotOAuthRefreshAccount(account *Account) *Account {
@@ -171,6 +196,26 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	executor OAuthRefreshExecutor,
 	refreshWindow time.Duration,
 ) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, refreshWindow, false)
+}
+
+// ForceRefresh 执行管理员显式触发的刷新。它不会受 token 到期窗口限制，且要求
+// Redis 提供带所有权的租约；协调层不可用时宁可拒绝，也不进行无锁上游刷新。
+func (api *OAuthRefreshAPI) ForceRefresh(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, 0, true)
+}
+
+func (api *OAuthRefreshAPI) refresh(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+	refreshWindow time.Duration,
+	force bool,
+) (*OAuthRefreshResult, error) {
 	if api == nil || api.accountRepo == nil {
 		return nil, errors.New("oauth refresh account repository is not configured")
 	}
@@ -181,34 +226,82 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		return nil, errors.New("oauth refresh executor is nil")
 	}
 	requestPath := isOAuthRefreshRequestPath(ctx)
-	cacheKey := executor.CacheKey(account)
-
-	// 0. 获取进程内互斥锁（防止同一进程内的并发刷新竞争）
-	localMu := api.getLocalLock(cacheKey)
-	if err := localMu.Lock(ctx); err != nil {
-		return nil, fmt.Errorf("oauth refresh local lock: %w", err)
+	tokenCacheKey := executor.CacheKey(account)
+	lockKey := oauthRefreshAccountLockKey(account.ID)
+	var activeLeaseLost *atomic.Bool
+	var localMu *contextMutex
+	if !force {
+		// 按需刷新保留原有“先本地等待、再重读数据库”的语义，避免同进程
+		// 竞争被误判为跨实例冲突。
+		localMu = api.getLocalLock(tokenCacheKey)
+		if err := localMu.Lock(ctx); err != nil {
+			return nil, fmt.Errorf("oauth refresh local lock: %w", err)
+		}
+		defer localMu.Unlock()
 	}
-	defer localMu.Unlock()
 
-	// 1. 获取分布式锁
+	// 1. 先获取跨实例租约。顺序早于进程内锁，避免同一实例的第二个强制刷新
+	// 等待首个请求结束后再次调用上游。
+	if api.tokenCache == nil && force {
+		return nil, fmt.Errorf("%w: token cache is not configured", errOAuthRefreshLeaseUnavailable)
+	}
 	if api.tokenCache != nil {
-		acquired, lockErr := api.tokenCache.AcquireRefreshLock(ctx, cacheKey, api.lockTTL)
-		if lockErr != nil {
-			// Redis 错误，降级为无锁刷新（进程内互斥锁仍生效）
-			slog.Warn("oauth_refresh_lock_failed_degraded",
-				"account_id", account.ID,
-				"cache_key", cacheKey,
-				"error", lockErr,
-			)
-		} else if !acquired {
-			// 锁被其他 worker 持有
-			return &OAuthRefreshResult{LockHeld: true}, nil
+		if leaseCache, ok := api.tokenCache.(OAuthRefreshLeaseCache); ok {
+			owner := uuid.NewString()
+			acquired, lockErr := leaseCache.TryAcquireRefreshLease(ctx, lockKey, owner, api.lockTTL)
+			if lockErr != nil {
+				if force {
+					return nil, fmt.Errorf("%w: %v", errOAuthRefreshLeaseUnavailable, lockErr)
+				}
+				slog.Warn("oauth_refresh_lease_failed_degraded",
+					"account_id", account.ID,
+					"error", lockErr,
+				)
+			} else if !acquired {
+				return &OAuthRefreshResult{LockHeld: true}, nil
+			} else {
+				leaseCtx, leaseLost, stopRenewal := api.startRefreshLeaseRenewal(ctx, leaseCache, lockKey, owner, account.ID)
+				activeLeaseLost = leaseLost
+				ctx = leaseCtx
+				defer func() {
+					stopRenewal()
+					api.releaseOwnedRefreshLease(ctx, leaseCache, lockKey, owner)
+				}()
+				defer func() {
+					if leaseLost.Load() {
+						slog.Warn("oauth_refresh_lease_lost", "account_id", account.ID)
+					}
+				}()
+			}
+		} else if force {
+			return nil, fmt.Errorf("%w: owner-aware lease is not configured", errOAuthRefreshLeaseUnavailable)
 		} else {
-			defer api.releaseRefreshLock(ctx, cacheKey)
+			// 兼容旧测试实现；生产 Redis cache 实现 OAuthRefreshLeaseCache。
+			acquired, lockErr := api.tokenCache.AcquireRefreshLock(ctx, lockKey, api.lockTTL)
+			if lockErr != nil {
+				slog.Warn("oauth_refresh_lock_failed_degraded", "account_id", account.ID, "error", lockErr)
+			} else if !acquired {
+				return &OAuthRefreshResult{LockHeld: true}, nil
+			} else {
+				defer api.releaseRefreshLock(ctx, lockKey)
+			}
 		}
 	}
 
-	// 2. 从 DB 重读最新 account（锁保护下，确保使用最新的 refresh_token）
+	// 2. 强制刷新在分布式租约之后获取本地锁；第二个请求会在 Redis 层立即
+	// 得到“正在刷新”，而不会等待后再次执行一次强制刷新。
+	if force {
+		localMu = api.getLocalLock(lockKey)
+		if err := localMu.Lock(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil, errOAuthRefreshLeaseLost
+			}
+			return nil, fmt.Errorf("oauth refresh local lock: %w", err)
+		}
+		defer localMu.Unlock()
+	}
+
+	// 3. 从 DB 重读最新 account（锁保护下，确保使用最新的 refresh_token）
 	freshAccount, err := api.accountRepo.GetByID(ctx, account.ID)
 	if err != nil {
 		if requestPath {
@@ -225,7 +318,7 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	if freshAccount.ID != account.ID {
 		return nil, fmt.Errorf("%w: account identity mismatch", errOAuthRefreshAccountRereadFailed)
 	}
-	if !freshAccount.IsActive() {
+	if !force && !freshAccount.IsActive() {
 		if requestPath {
 			return nil, fmt.Errorf("%w: account is not active", errOAuthRefreshAccountStateChanged)
 		}
@@ -246,16 +339,26 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		return &OAuthRefreshResult{Account: freshAccount}, nil
 	}
 
-	// 3. 二次检查是否仍需刷新（另一条路径可能已刷新）
-	if !executor.NeedsRefresh(freshAccount, refreshWindow) {
+	// 4. 后台路径二次检查是否仍需刷新；管理员强制刷新跳过到期窗口。
+	if !force && !executor.NeedsRefresh(freshAccount, refreshWindow) {
 		return &OAuthRefreshResult{
 			Account: freshAccount,
 		}, nil
 	}
 
-	// 4. 执行平台特定刷新逻辑
+	// 5. 执行平台特定刷新逻辑
 	attemptedAccount := snapshotOAuthRefreshAccount(freshAccount)
-	newCredentials, refreshErr := executor.Refresh(ctx, freshAccount)
+	var warning string
+	var newCredentials map[string]any
+	var refreshErr error
+	if outcomeExecutor, ok := executor.(OAuthRefreshOutcomeExecutor); ok {
+		newCredentials, warning, refreshErr = outcomeExecutor.RefreshWithOutcome(ctx, freshAccount)
+	} else {
+		newCredentials, refreshErr = executor.Refresh(ctx, freshAccount)
+	}
+	if activeLeaseLost != nil && activeLeaseLost.Load() {
+		return &OAuthRefreshResult{Account: attemptedAccount}, errOAuthRefreshLeaseLost
+	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		// A provider implementation may ignore cancellation and return late
 		// credentials. Never persist them after the attempt/cycle boundary.
@@ -290,7 +393,7 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		return result, refreshErr
 	}
 
-	// 5. 设置版本号 + 更新 DB
+	// 6. 设置版本号 + 更新 DB
 	if newCredentials != nil {
 		newCredentials["_token_version"] = time.Now().UnixMilli()
 		if freshAccount.IsGrokOAuth() {
@@ -336,7 +439,7 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 				)
 				return &OAuthRefreshResult{Account: currentAccount}, nil
 			}
-			durableAccount, readErr := api.loadGrokDurableAccountAfterPersist(ctx, cacheKey, freshAccount.ID)
+			durableAccount, readErr := api.loadGrokDurableAccountAfterPersist(ctx, tokenCacheKey, freshAccount.ID)
 			if readErr != nil || durableAccount == nil {
 				if readErr == nil {
 					readErr = fmt.Errorf("account not found after Grok OAuth success CAS")
@@ -350,11 +453,37 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 			// while the provider call was in flight. Return the durable row so
 			// post-refresh cache publication cannot restore that stale snapshot.
 			freshAccount = durableAccount
-		} else if updateErr := persistAccountCredentials(ctx, api.accountRepo, freshAccount, newCredentials); updateErr != nil {
-			slog.Error("oauth_refresh_update_failed",
-				"account_id", freshAccount.ID,
-				"error", updateErr,
+		} else if conditionalRepo, ok := api.accountRepo.(OAuthCredentialsCASRepository); ok {
+			applied, updateErr := conditionalRepo.UpdateOAuthCredentialsIfUnchanged(
+				ctx,
+				freshAccount.ID,
+				attemptedAccount.Credentials,
+				attemptedAccount.ProxyID,
+				newCredentials,
 			)
+			if updateErr != nil {
+				slog.Error("oauth_refresh_update_failed", "account_id", freshAccount.ID, "error", updateErr)
+				return nil, fmt.Errorf("%w: %v", errOAuthRefreshCredentialPersist, updateErr)
+			}
+			currentAccount, readErr := api.accountRepo.GetByID(ctx, freshAccount.ID)
+			if readErr != nil || currentAccount == nil {
+				if readErr == nil {
+					readErr = errors.New("account not found after OAuth credential CAS")
+				}
+				return nil, fmt.Errorf("%w: %v", errOAuthRefreshCredentialPersist, readErr)
+			}
+			if !applied {
+				slog.Info("oauth_refresh_success_cas_skipped_stale_credentials",
+					"account_id", freshAccount.ID,
+					"platform", freshAccount.Platform,
+				)
+				return &OAuthRefreshResult{Account: currentAccount}, nil
+			}
+			freshAccount = currentAccount
+		} else if force {
+			return nil, fmt.Errorf("%w: OAuth credential CAS repository is not configured", errOAuthRefreshCredentialPersist)
+		} else if updateErr := persistAccountCredentials(ctx, api.accountRepo, freshAccount, newCredentials); updateErr != nil {
+			slog.Error("oauth_refresh_update_failed", "account_id", freshAccount.ID, "error", updateErr)
 			return nil, fmt.Errorf("%w: %v", errOAuthRefreshCredentialPersist, updateErr)
 		}
 	}
@@ -369,7 +498,84 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		Refreshed:      true,
 		NewCredentials: newCredentials,
 		Account:        freshAccount,
+		Warning:        warning,
 	}, nil
+}
+
+func oauthRefreshAccountLockKey(accountID int64) string {
+	return "account:" + strconv.FormatInt(accountID, 10)
+}
+
+// startRefreshLeaseRenewal 在上游刷新期间定时延长租约。续租失败意味着当前请求
+// 已不能证明自己仍是唯一持有者，因此取消请求并禁止后续凭证落库。
+func (api *OAuthRefreshAPI) startRefreshLeaseRenewal(
+	parent context.Context,
+	cache OAuthRefreshLeaseCache,
+	lockKey string,
+	owner string,
+	accountID int64,
+) (context.Context, *atomic.Bool, func()) {
+	leaseCtx, cancel := context.WithCancel(parent)
+	lost := &atomic.Bool{}
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+	interval := api.lockTTL / 3
+	if interval < 100*time.Millisecond {
+		interval = 100 * time.Millisecond
+	}
+
+	go func() {
+		defer close(doneCh)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-leaseCtx.Done():
+				return
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				renewTimeout := defaultRefreshLockReleaseTimeout
+				if halfTTL := api.lockTTL / 2; halfTTL > 0 && halfTTL < renewTimeout {
+					renewTimeout = halfTTL
+				}
+				renewCtx, renewCancel := context.WithTimeout(leaseCtx, renewTimeout)
+				ok, err := cache.RenewRefreshLease(renewCtx, lockKey, owner, api.lockTTL)
+				renewCancel()
+				if err != nil || !ok {
+					lost.Store(true)
+					cancel()
+					slog.Warn("oauth_refresh_lease_renew_failed",
+						"account_id", accountID,
+						"error", err,
+					)
+					return
+				}
+			}
+		}
+	}()
+
+	var stopOnce sync.Once
+	stop := func() {
+		stopOnce.Do(func() {
+			close(stopCh)
+			cancel()
+		})
+		<-doneCh
+	}
+	return leaseCtx, lost, stop
+}
+
+func (api *OAuthRefreshAPI) releaseOwnedRefreshLease(parent context.Context, cache OAuthRefreshLeaseCache, lockKey, owner string) {
+	cleanupParent := context.Background()
+	if parent != nil {
+		cleanupParent = context.WithoutCancel(parent)
+	}
+	ctx, cancel := context.WithTimeout(cleanupParent, defaultRefreshLockReleaseTimeout)
+	defer cancel()
+	if err := cache.ReleaseRefreshLease(ctx, lockKey, owner); err != nil {
+		slog.Warn("oauth_refresh_lease_release_failed", "lock_key", lockKey, "error", err)
+	}
 }
 
 func (api *OAuthRefreshAPI) releaseRefreshLock(parent context.Context, cacheKey string) {

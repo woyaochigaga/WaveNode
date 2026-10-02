@@ -4,11 +4,62 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+type dingTalkSharedCacheStub struct {
+	mu          sync.Mutex
+	token       string
+	ttl         time.Duration
+	lockOwner   string
+	deleteCalls int
+}
+
+func (c *dingTalkSharedCacheStub) Get(context.Context, string) (string, time.Duration, bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.token, c.ttl, c.token != "", nil
+}
+
+func (c *dingTalkSharedCacheStub) Set(_ context.Context, _ string, token string, ttl time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.token = token
+	c.ttl = ttl
+	return nil
+}
+
+func (c *dingTalkSharedCacheStub) Delete(context.Context, string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.token = ""
+	c.ttl = 0
+	c.deleteCalls++
+	return nil
+}
+
+func (c *dingTalkSharedCacheStub) TryAcquireRefresh(_ context.Context, _ string, owner string, _ time.Duration) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lockOwner != "" {
+		return false, nil
+	}
+	c.lockOwner = owner
+	return true, nil
+}
+
+func (c *dingTalkSharedCacheStub) ReleaseRefresh(_ context.Context, _ string, owner string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lockOwner == owner {
+		c.lockOwner = ""
+	}
+	return nil
+}
 
 func TestDingTalkClient_ExchangeCodeForUserToken_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +119,88 @@ func TestDingTalkClient_GetAppToken_Cached(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, t1, t2)
 	require.Equal(t, 1, callCount, "second call should hit cache")
+}
+
+func TestDingTalkClient_GetAppToken_TwoInstancesFetchOnce(t *testing.T) {
+	var mu sync.Mutex
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+		time.Sleep(150 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"accessToken":"SHARED_APP_TOKEN","expireIn":7200}`))
+	}))
+	defer server.Close()
+
+	cache := &dingTalkSharedCacheStub{}
+	newClient := func() *DingTalkClient {
+		return &DingTalkClient{
+			cfg: dingTalkClientConfig{
+				ClientID: "shared-app", ClientSecret: "secret", TokenURL: server.URL + "/gettoken",
+			},
+			httpClient:  server.Client(),
+			sharedCache: cache,
+		}
+	}
+	first, second := newClient(), newClient()
+	results := make(chan string, 2)
+	errs := make(chan error, 2)
+	for _, client := range []*DingTalkClient{first, second} {
+		go func(cli *DingTalkClient) {
+			token, err := cli.GetAppToken(context.Background())
+			results <- token
+			errs <- err
+		}(client)
+	}
+	for range 2 {
+		require.NoError(t, <-errs)
+		require.Equal(t, "SHARED_APP_TOKEN", <-results)
+	}
+	mu.Lock()
+	require.Equal(t, 1, callCount)
+	mu.Unlock()
+}
+
+func TestDingTalkClient_InvalidAppTokenInvalidatesAndRetriesOnce(t *testing.T) {
+	tokenCalls := 0
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenCalls++
+		_, _ = w.Write([]byte(`{"accessToken":"NEW_APP_TOKEN","expireIn":7200}`))
+	}))
+	defer tokenServer.Close()
+	businessCalls := 0
+	businessServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		businessCalls++
+		if businessCalls == 1 {
+			_, _ = w.Write([]byte(`{"errcode":40014,"errmsg":"invalid access token"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"errcode":0,"result":{"userid":"USER-42"}}`))
+	}))
+	defer businessServer.Close()
+
+	cache := &dingTalkSharedCacheStub{token: "STALE_APP_TOKEN", ttl: time.Hour}
+	client := &DingTalkClient{
+		cfg: dingTalkClientConfig{
+			ClientID: "app", ClientSecret: "secret",
+			TokenURL: tokenServer.URL + "/gettoken", UserInfoURL: businessServer.URL + "/stub",
+		},
+		httpClient:  businessServer.Client(),
+		sharedCache: cache,
+	}
+	// token 获取和业务调用使用不同测试服务，因此自定义 transport 按 host 正常路由。
+	client.httpClient = &http.Client{Timeout: time.Second}
+
+	userID, err := client.GetUserIdByUnionId(context.Background(), "UNION-42")
+	require.NoError(t, err)
+	require.Equal(t, "USER-42", userID)
+	require.Equal(t, 1, tokenCalls)
+	require.Equal(t, 2, businessCalls)
+	cache.mu.Lock()
+	require.Equal(t, 1, cache.deleteCalls)
+	require.Equal(t, "NEW_APP_TOKEN", cache.token)
+	cache.mu.Unlock()
 }
 
 func TestDingTalkClient_GetUserIdByUnionId_60011(t *testing.T) {

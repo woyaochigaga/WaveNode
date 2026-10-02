@@ -43,6 +43,14 @@ type tokenRefreshRegistration struct {
 	executor  OAuthRefreshExecutor
 }
 
+// AccountCredentialRefreshResult 是管理员手动刷新所需的最小结果。
+// Warning 只表示 token 已成功更新后的非致命问题，不代表刷新失败。
+type AccountCredentialRefreshResult struct {
+	Account   *Account
+	Refreshed bool
+	Warning   string
+}
+
 // GrokOAuthRefreshMutationRepository protects background refresh failure
 // mutations with the exact credential document used by the upstream attempt.
 // This contract is intentionally Grok-only; existing provider behavior remains
@@ -150,6 +158,101 @@ func (s *TokenRefreshService) eligiblePlatforms() []string {
 		}
 	}
 	return platforms
+}
+
+// RefreshAccountCredentials 复用后台刷新使用的 provider registry，但强制执行
+// 一次刷新，并要求跨实例租约和凭证 CAS 都可用。
+func (s *TokenRefreshService) RefreshAccountCredentials(ctx context.Context, accountID int64) (*AccountCredentialRefreshResult, error) {
+	if s == nil || s.accountRepo == nil || s.refreshAPI == nil {
+		return nil, infraerrors.ServiceUnavailable(
+			"ACCOUNT_REFRESH_COORDINATION_UNAVAILABLE",
+			"Credential refresh is temporarily unavailable; please retry later",
+		)
+	}
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if account == nil {
+		return nil, ErrAccountNotFound
+	}
+	if !account.IsOAuth() {
+		return nil, infraerrors.BadRequest("ACCOUNT_REFRESH_UNSUPPORTED", "This account does not support OAuth credential refresh")
+	}
+	if account.IsCredentialShadow() {
+		return nil, infraerrors.BadRequest("SPARK_SHADOW_NO_REFRESH", "Spark shadow credentials are managed by the parent account")
+	}
+
+	var executor OAuthRefreshExecutor
+	for _, registration := range s.registrations {
+		if registration.platform == account.Platform && registration.executor != nil && registration.executor.CanRefresh(account) {
+			executor = registration.executor
+			break
+		}
+	}
+	if executor == nil {
+		return nil, infraerrors.BadRequest("ACCOUNT_REFRESH_UNSUPPORTED", "This account does not have refreshable credentials")
+	}
+
+	result, refreshErr := s.refreshAPI.ForceRefresh(ctx, account, executor)
+	if refreshErr != nil {
+		slog.Warn("admin_account_refresh_failed",
+			"account_id", account.ID,
+			"platform", account.Platform,
+			"error", logredact.RedactText(refreshErr.Error()),
+		)
+		switch {
+		case errors.Is(refreshErr, context.Canceled), errors.Is(refreshErr, context.DeadlineExceeded):
+			return nil, refreshErr
+		case errors.Is(refreshErr, errOAuthRefreshLeaseUnavailable), errors.Is(refreshErr, errOAuthRefreshLeaseLost):
+			return nil, infraerrors.ServiceUnavailable(
+				"ACCOUNT_REFRESH_COORDINATION_UNAVAILABLE",
+				"Another server cannot safely coordinate this refresh right now; please retry later",
+			).WithCause(refreshErr)
+		case errors.Is(refreshErr, errOAuthRefreshAccountStateChanged):
+			return nil, infraerrors.Conflict(
+				"ACCOUNT_REFRESH_STATE_CHANGED",
+				"The account changed while it was being refreshed; the newer account state was kept",
+			).WithCause(refreshErr)
+		case errors.Is(refreshErr, errOAuthRefreshCredentialPersist):
+			return nil, infraerrors.ServiceUnavailable(
+				"ACCOUNT_REFRESH_PERSIST_FAILED",
+				"The provider refreshed the token, but the new credentials could not be saved safely",
+			).WithCause(refreshErr)
+		default:
+			return nil, infraerrors.New(
+				502,
+				"ACCOUNT_REFRESH_UPSTREAM_FAILED",
+				"The upstream provider rejected or failed the credential refresh; existing credentials were kept",
+			).WithCause(refreshErr)
+		}
+	}
+	if result == nil {
+		return nil, infraerrors.InternalServer("ACCOUNT_REFRESH_EMPTY_RESULT", "Credential refresh returned no result")
+	}
+	if result.LockHeld {
+		return nil, infraerrors.Conflict(
+			"ACCOUNT_REFRESH_IN_PROGRESS",
+			"This account is already being refreshed; wait a moment and try again",
+		).WithMetadata(map[string]string{"retry_after": "2"})
+	}
+	if result.Account == nil {
+		return nil, infraerrors.InternalServer("ACCOUNT_REFRESH_EMPTY_ACCOUNT", "Credential refresh returned no account")
+	}
+	if result.Refreshed {
+		s.postRefreshActions(ctx, result.Account)
+	}
+	slog.Info("admin_account_refresh_completed",
+		"account_id", result.Account.ID,
+		"platform", result.Account.Platform,
+		"refreshed", result.Refreshed,
+		"warning", result.Warning,
+	)
+	return &AccountCredentialRefreshResult{
+		Account:   result.Account,
+		Refreshed: result.Refreshed,
+		Warning:   result.Warning,
+	}, nil
 }
 
 func (s *TokenRefreshService) candidateAfterID() int64 {
@@ -1163,6 +1266,7 @@ func (s *TokenRefreshService) postRefreshActions(ctx context.Context, account *A
 	// Antigravity 账户：如果之前是因为缺少 project_id 而标记为 error，现在成功获取到了，清除错误状态
 	if account.Platform == PlatformAntigravity &&
 		account.Status == StatusError &&
+		strings.TrimSpace(account.GetCredential("project_id")) != "" &&
 		strings.Contains(account.ErrorMessage, "missing_project_id:") {
 		if clearErr := s.accountRepo.ClearError(ctx, account.ID); clearErr != nil {
 			slog.Warn("token_refresh.clear_account_error_failed",

@@ -1348,6 +1348,112 @@ func (s *AccountRepoSuite) TestUpdateGrokOAuthCredentialsIfUnchanged_SkipsConcur
 	s.Require().Zero(outboxCount)
 }
 
+func (s *AccountRepoSuite) TestUpdateOAuthCredentialsIfUnchanged_AppliesAndPublishesSchedulerState() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:        "oauth-refresh-success-cas-applied",
+		Platform:    service.PlatformAnthropic,
+		Type:        service.AccountTypeOAuth,
+		Status:      service.StatusActive,
+		Schedulable: true,
+		Credentials: map[string]any{
+			"access_token":  "attempted-access",
+			"refresh_token": "attempted-refresh",
+			"expires_at":    "2026-10-02T12:00:00Z",
+		},
+	})
+	observed, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+	_, err = s.repo.sql.ExecContext(s.ctx, "TRUNCATE scheduler_outbox")
+	s.Require().NoError(err)
+
+	applied, err := s.repo.UpdateOAuthCredentialsIfUnchanged(
+		s.ctx,
+		account.ID,
+		observed.Credentials,
+		observed.ProxyID,
+		map[string]any{
+			"access_token":  "rotated-access",
+			"refresh_token": "rotated-refresh",
+			"expires_at":    "2026-10-02T16:00:00Z",
+		},
+	)
+
+	s.Require().NoError(err)
+	s.Require().True(applied)
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Equal("rotated-refresh", got.GetCredential("refresh_token"))
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal("rotated-refresh", cacheRecorder.setAccounts[0].GetCredential("refresh_token"))
+	s.Require().NoError(cacheRecorder.setCtxErr)
+
+	var outboxCount int
+	err = scanSingleRow(
+		s.ctx,
+		s.repo.sql,
+		"SELECT COUNT(*) FROM scheduler_outbox WHERE event_type = $1 AND account_id = $2",
+		[]any{service.SchedulerOutboxEventAccountChanged, account.ID},
+		&outboxCount,
+	)
+	s.Require().NoError(err)
+	s.Require().Equal(1, outboxCount)
+}
+
+func (s *AccountRepoSuite) TestUpdateOAuthCredentialsIfUnchanged_SkipsConcurrentReauthorization() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:        "oauth-refresh-success-cas-reauthorized",
+		Platform:    service.PlatformAnthropic,
+		Type:        service.AccountTypeOAuth,
+		Status:      service.StatusActive,
+		Schedulable: true,
+		Credentials: map[string]any{
+			"access_token":  "attempted-access",
+			"refresh_token": "attempted-refresh",
+		},
+	})
+	observed, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().NoError(s.repo.UpdateCredentials(s.ctx, account.ID, map[string]any{
+		"access_token":  "reauthorized-access",
+		"refresh_token": "reauthorized-refresh",
+	}))
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+	_, err = s.repo.sql.ExecContext(s.ctx, "TRUNCATE scheduler_outbox")
+	s.Require().NoError(err)
+
+	applied, err := s.repo.UpdateOAuthCredentialsIfUnchanged(
+		s.ctx,
+		account.ID,
+		observed.Credentials,
+		observed.ProxyID,
+		map[string]any{
+			"access_token":  "provider-access",
+			"refresh_token": "provider-refresh",
+		},
+	)
+
+	s.Require().NoError(err)
+	s.Require().False(applied)
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Equal("reauthorized-refresh", got.GetCredential("refresh_token"))
+	s.Require().Empty(cacheRecorder.setAccounts)
+
+	var outboxCount int
+	err = scanSingleRow(
+		s.ctx,
+		s.repo.sql,
+		"SELECT COUNT(*) FROM scheduler_outbox WHERE event_type = $1 AND account_id = $2",
+		[]any{service.SchedulerOutboxEventAccountChanged, account.ID},
+		&outboxCount,
+	)
+	s.Require().NoError(err)
+	s.Require().Zero(outboxCount)
+}
+
 func (s *AccountRepoSuite) TestGrokOAuthConditionalMutation_DetachesBoundedSnapshotSync() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{
 		Name:        "grok-conditional-detached-sync",

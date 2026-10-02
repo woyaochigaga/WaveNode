@@ -33,24 +33,32 @@ func (s *grokRefreshOAuthStub) BuildAccountCredentials(info *service.GrokTokenIn
 
 type grokRefreshAdminService struct {
 	*stubAdminService
-	updatedCredentials map[string]any
+	refreshCalls int
+	result       *service.AccountCredentialRefreshResult
 }
 
-func (s *grokRefreshAdminService) UpdateAccount(_ context.Context, id int64, input *service.UpdateAccountInput) (*service.Account, error) {
-	s.updatedCredentials = input.Credentials
-	return &service.Account{
-		ID:          id,
-		Platform:    service.PlatformGrok,
-		Type:        service.AccountTypeOAuth,
-		Status:      service.StatusActive,
-		Credentials: input.Credentials,
-	}, nil
+func (s *grokRefreshAdminService) RefreshAccountCredentials(_ context.Context, _ int64) (*service.AccountCredentialRefreshResult, error) {
+	s.refreshCalls++
+	return s.result, nil
 }
 
-func TestRefreshSingleAccountRoutesGrokThroughGrokOAuthService(t *testing.T) {
+func TestRefreshSingleAccountRoutesGrokThroughUnifiedAdminRefresh(t *testing.T) {
 	t.Parallel()
 
-	adminSvc := &grokRefreshAdminService{stubAdminService: newStubAdminService()}
+	updatedAccount := &service.Account{
+		ID:       4227,
+		Platform: service.PlatformGrok,
+		Type:     service.AccountTypeOAuth,
+		Status:   service.StatusActive,
+		Credentials: map[string]any{
+			"access_token":  "new-access",
+			"refresh_token": "new-refresh",
+		},
+	}
+	adminSvc := &grokRefreshAdminService{
+		stubAdminService: newStubAdminService(),
+		result:           &service.AccountCredentialRefreshResult{Account: updatedAccount, Refreshed: true},
+	}
 	grokOAuth := &grokRefreshOAuthStub{info: &service.GrokTokenInfo{
 		AccessToken:  "new-access",
 		RefreshToken: "new-refresh",
@@ -88,12 +96,7 @@ func TestRefreshSingleAccountRoutesGrokThroughGrokOAuthService(t *testing.T) {
 	updated, warning, err := handler.refreshSingleAccount(context.Background(), account)
 	require.NoError(t, err)
 	require.Empty(t, warning)
-	require.Equal(t, 1, grokOAuth.calls)
-	require.Same(t, account, grokOAuth.account)
-	require.Equal(t, "new-access", adminSvc.updatedCredentials["access_token"])
-	require.Equal(t, "new-refresh", adminSvc.updatedCredentials["refresh_token"])
-	require.Equal(t, "https://example.invalid/v1", adminSvc.updatedCredentials["base_url"])
-	require.Equal(t, "SUPER_GROK", adminSvc.updatedCredentials["subscription_tier"])
-	require.Equal(t, "ACTIVE", adminSvc.updatedCredentials["entitlement_status"])
-	require.Equal(t, adminSvc.updatedCredentials, updated.Credentials)
+	require.Equal(t, 1, adminSvc.refreshCalls)
+	require.Zero(t, grokOAuth.calls, "handler must not bypass the unified refresh coordinator")
+	require.Same(t, updatedAccount, updated)
 }

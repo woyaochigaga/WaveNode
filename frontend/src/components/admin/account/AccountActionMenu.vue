@@ -33,9 +33,13 @@
                 <Icon name="link" size="sm" />
                 {{ t('admin.accounts.reAuthorize') }}
               </button>
-              <button @click="$emit('refresh-token', account); $emit('close')" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-purple-600 hover:bg-gray-100 dark:hover:bg-dark-700">
-                <Icon name="refresh" size="sm" />
-                {{ t('admin.accounts.refreshToken') }}
+              <button
+                :disabled="refreshing"
+                @click="$emit('refresh-token', account); $emit('close')"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-purple-600 hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-dark-700"
+              >
+                <Icon name="refresh" size="sm" :class="{ 'animate-spin': refreshing }" />
+                {{ refreshing ? t('admin.accounts.refreshingToken') : t('admin.accounts.refreshToken') }}
               </button>
             </template>
             <button v-if="isOpenAIOAuthParent" @click="$emit('create-spark-shadow', account); $emit('close')" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-amber-600 hover:bg-gray-100 dark:hover:bg-dark-700">
@@ -69,7 +73,14 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@/components/icons'
 import type { Account } from '@/types'
 
-const props = defineProps<{ show: boolean; account: Account | null; anchorRect: DOMRect | null }>()
+const props = withDefaults(defineProps<{
+  show: boolean
+  account: Account | null
+  anchorRect: DOMRect | null
+  refreshing?: boolean
+}>(), {
+  refreshing: false,
+})
 const emit = defineEmits(['close', 'test', 'stats', 'schedule', 'duplicate', 'reauth', 'refresh-token', 'recover-state', 'reset-quota', 'set-privacy', 'create-spark-shadow'])
 const { t } = useI18n()
 const menuRef = ref<HTMLElement | null>(null)

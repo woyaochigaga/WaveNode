@@ -1408,146 +1408,23 @@ func (h *AccountHandler) PreviewFromCRS(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// refreshSingleAccount refreshes credentials for a single OAuth account.
-// Returns (updatedAccount, warning, error) where warning is used for Antigravity ProjectIDMissing scenario.
+// refreshSingleAccount 将单个和批量入口统一委托给 AdminService，确保所有平台共享
+// 同一套跨实例租约、凭证 CAS 和缓存失效规则。
 func (h *AccountHandler) refreshSingleAccount(ctx context.Context, account *service.Account) (*service.Account, string, error) {
+	if account == nil {
+		return nil, "", service.ErrAccountNotFound
+	}
 	if !account.IsOAuth() {
-		return nil, "", infraerrors.BadRequest("NOT_OAUTH", "cannot refresh non-OAuth account")
+		return nil, "", infraerrors.BadRequest("ACCOUNT_REFRESH_UNSUPPORTED", "This account does not support OAuth credential refresh")
 	}
-	// spark 影子凭据由母账号管理、自身恒空,刷新无意义且会先打上游;在调用上游前早拒
-	// (覆盖单账号与批量两入口;批量侧将其计为 failed 并附说明)(外审第6轮)。
 	if account.IsCredentialShadow() {
-		return nil, "", infraerrors.BadRequest("SPARK_SHADOW_NO_REFRESH",
-			"cannot refresh spark shadow account; its credentials are managed by the parent account")
+		return nil, "", infraerrors.BadRequest("SPARK_SHADOW_NO_REFRESH", "Spark shadow credentials are managed by the parent account")
 	}
-
-	var newCredentials map[string]any
-
-	if account.IsOpenAI() {
-		tokenInfo, err := h.openaiOAuthService.RefreshAccountToken(ctx, account)
-		if err != nil {
-			// 刷新失败但 access_token 可能仍有效，尝试设置隐私
-			h.adminService.EnsureOpenAIPrivacy(ctx, account)
-			return nil, "", err
-		}
-
-		newCredentials = h.openaiOAuthService.BuildAccountCredentials(tokenInfo)
-		for k, v := range account.Credentials {
-			if _, exists := newCredentials[k]; !exists {
-				newCredentials[k] = v
-			}
-		}
-		newCredentials = service.NormalizeOpenAIPersonalAccessTokenCredentials(account, tokenInfo, newCredentials)
-	} else if account.Platform == service.PlatformGemini {
-		tokenInfo, err := h.geminiOAuthService.RefreshAccountToken(ctx, account)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to refresh credentials: %w", err)
-		}
-
-		newCredentials = h.geminiOAuthService.BuildAccountCredentials(tokenInfo)
-		for k, v := range account.Credentials {
-			if _, exists := newCredentials[k]; !exists {
-				newCredentials[k] = v
-			}
-		}
-	} else if account.Platform == service.PlatformAntigravity {
-		tokenInfo, err := h.antigravityOAuthService.RefreshAccountToken(ctx, account)
-		if err != nil {
-			return nil, "", err
-		}
-
-		newCredentials = h.antigravityOAuthService.BuildAccountCredentials(tokenInfo)
-		for k, v := range account.Credentials {
-			if _, exists := newCredentials[k]; !exists {
-				newCredentials[k] = v
-			}
-		}
-
-		// 特殊处理 project_id：如果新值为空但旧值非空，保留旧值
-		// 这确保了即使 LoadCodeAssist 失败，project_id 也不会丢失
-		if newProjectID, _ := newCredentials["project_id"].(string); newProjectID == "" {
-			if oldProjectID := strings.TrimSpace(account.GetCredential("project_id")); oldProjectID != "" {
-				newCredentials["project_id"] = oldProjectID
-			}
-		}
-
-		// 如果 project_id 获取失败，更新凭证但不标记为 error
-		if tokenInfo.ProjectIDMissing {
-			updatedAccount, updateErr := h.adminService.UpdateAccount(ctx, account.ID, &service.UpdateAccountInput{
-				Credentials: newCredentials,
-			})
-			if updateErr != nil {
-				return nil, "", fmt.Errorf("failed to update credentials: %w", updateErr)
-			}
-			h.adminService.EnsureAntigravityPrivacy(ctx, updatedAccount)
-			return updatedAccount, "missing_project_id_temporary", nil
-		}
-
-		// 成功获取到 project_id，如果之前是 missing_project_id 错误则清除
-		if account.Status == service.StatusError && strings.Contains(account.ErrorMessage, "missing_project_id:") {
-			if _, clearErr := h.adminService.ClearAccountError(ctx, account.ID); clearErr != nil {
-				return nil, "", fmt.Errorf("failed to clear account error: %w", clearErr)
-			}
-		}
-	} else if account.Platform == service.PlatformGrok {
-		if h.grokOAuthService == nil {
-			return nil, "", fmt.Errorf("grok oauth service is not configured")
-		}
-		tokenInfo, err := h.grokOAuthService.RefreshAccountToken(ctx, account)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to refresh Grok credentials: %w", err)
-		}
-
-		newCredentials = service.MergeCredentials(account.Credentials, h.grokOAuthService.BuildAccountCredentials(tokenInfo))
-		if baseURL := strings.TrimSpace(account.GetCredential("base_url")); baseURL != "" {
-			newCredentials["base_url"] = baseURL
-		}
-	} else {
-		// Use Anthropic/Claude OAuth service to refresh token
-		tokenInfo, err := h.oauthService.RefreshAccountToken(ctx, account)
-		if err != nil {
-			return nil, "", err
-		}
-
-		// Copy existing credentials to preserve non-token settings (e.g., intercept_warmup_requests)
-		newCredentials = make(map[string]any)
-		for k, v := range account.Credentials {
-			newCredentials[k] = v
-		}
-
-		// Update token-related fields
-		newCredentials["access_token"] = tokenInfo.AccessToken
-		newCredentials["token_type"] = tokenInfo.TokenType
-		newCredentials["expires_in"] = strconv.FormatInt(tokenInfo.ExpiresIn, 10)
-		newCredentials["expires_at"] = strconv.FormatInt(tokenInfo.ExpiresAt, 10)
-		if strings.TrimSpace(tokenInfo.RefreshToken) != "" {
-			newCredentials["refresh_token"] = tokenInfo.RefreshToken
-		}
-		if strings.TrimSpace(tokenInfo.Scope) != "" {
-			newCredentials["scope"] = tokenInfo.Scope
-		}
-	}
-
-	updatedAccount, err := h.adminService.UpdateAccount(ctx, account.ID, &service.UpdateAccountInput{
-		Credentials: newCredentials,
-	})
+	result, err := h.adminService.RefreshAccountCredentials(ctx, account.ID)
 	if err != nil {
 		return nil, "", err
 	}
-
-	// 刷新成功后，清除 token 缓存，确保下次请求使用新 token
-	if h.tokenCacheInvalidator != nil {
-		if invalidateErr := h.tokenCacheInvalidator.InvalidateToken(ctx, updatedAccount); invalidateErr != nil {
-			log.Printf("[WARN] Failed to invalidate token cache for account %d: %v", updatedAccount.ID, invalidateErr)
-		}
-	}
-
-	// OpenAI OAuth: 刷新成功后检查并设置 privacy_mode
-	h.adminService.EnsureOpenAIPrivacy(ctx, updatedAccount)
-	// Antigravity OAuth: 刷新成功后检查并设置 privacy_mode
-	h.adminService.EnsureAntigravityPrivacy(ctx, updatedAccount)
-
-	return updatedAccount, "", nil
+	return result.Account, result.Warning, nil
 }
 
 // Refresh handles refreshing account credentials
@@ -2028,7 +1905,8 @@ func (h *AccountHandler) BatchRefresh(c *gin.Context) {
 			failedCount++
 			errors = append(errors, gin.H{
 				"account_id": id,
-				"error":      "account not found",
+				"error_code": "ACCOUNT_NOT_FOUND",
+				"error":      "Account not found",
 			})
 		}
 	}
@@ -2043,10 +1921,13 @@ func (h *AccountHandler) BatchRefresh(c *gin.Context) {
 			_, warning, err := h.refreshSingleAccount(gctx, acc)
 			mu.Lock()
 			if err != nil {
+				// 批量接口只返回稳定错误码和安全消息，避免把内部 cause 暴露给前端。
+				appErr := infraerrors.FromError(err)
 				failedCount++
 				errors = append(errors, gin.H{
 					"account_id": acc.ID,
-					"error":      err.Error(),
+					"error_code": appErr.Reason,
+					"error":      appErr.Message,
 				})
 			} else {
 				successCount++

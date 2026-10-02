@@ -1293,13 +1293,14 @@ func (s *adminServiceImpl) DeleteAccount(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *adminServiceImpl) RefreshAccountCredentials(ctx context.Context, id int64) (*Account, error) {
-	account, err := s.accountRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
+func (s *adminServiceImpl) RefreshAccountCredentials(ctx context.Context, id int64) (*AccountCredentialRefreshResult, error) {
+	if s.credentialRefresher == nil {
+		return nil, infraerrors.ServiceUnavailable(
+			"ACCOUNT_REFRESH_COORDINATION_UNAVAILABLE",
+			"Credential refresh is temporarily unavailable; please retry later",
+		)
 	}
-	// TODO: Implement refresh logic
-	return account, nil
+	return s.credentialRefresher.RefreshAccountCredentials(ctx, id)
 }
 
 func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Account, error) {

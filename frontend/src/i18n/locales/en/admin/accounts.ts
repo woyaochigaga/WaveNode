@@ -487,6 +487,7 @@ export default {
       testConnection: 'Test Connection',
       reAuthorize: 'Re-Authorize',
       refreshToken: 'Refresh Token',
+      refreshingToken: 'Refreshing token…',
       noAccountsYet: 'No accounts yet',
       createFirstAccount: 'Create your first account to start using AI services.',
       tokenRefreshed: 'Token refreshed successfully',
@@ -515,7 +516,19 @@ export default {
         probeUpstreamBilling: 'Probe Upstream Rate',
         resetStatusSuccess: 'Successfully reset {count} account(s) status',
         refreshTokenSuccess: 'Successfully refreshed {count} account(s) token',
+        refreshPartialSuccess: 'Refresh completed: {success} succeeded and {failed} failed. First failure: {reason}',
         partialSuccess: 'Partially completed: {success} succeeded, {failed} failed'
+      },
+      refreshErrors: {
+        ACCOUNT_NOT_FOUND: 'The account no longer exists',
+        ACCOUNT_REFRESH_IN_PROGRESS: 'This account is already refreshing. Please try again shortly.',
+        ACCOUNT_REFRESH_COORDINATION_UNAVAILABLE: 'The refresh coordination service is temporarily unavailable.',
+        ACCOUNT_REFRESH_STATE_CHANGED: 'The credentials changed during refresh. Reload the list and try again.',
+        ACCOUNT_REFRESH_PERSIST_FAILED: 'The new credentials could not be saved safely. Existing credentials were kept.',
+        ACCOUNT_REFRESH_UPSTREAM_FAILED: 'The upstream authorization service could not refresh this account.',
+        ACCOUNT_REFRESH_UNSUPPORTED: 'This account type does not support automatic refresh.',
+        SPARK_SHADOW_NO_REFRESH: 'Shadow credentials are managed by the parent account.',
+        unknown: 'Refresh failed. Please try again later.',
       },
       bulkEdit: {
         title: 'Bulk Edit Accounts',
