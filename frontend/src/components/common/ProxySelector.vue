@@ -172,19 +172,9 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import Icon from '@/components/icons/Icon.vue'
-import type { Proxy } from '@/types'
+import type { Proxy, ProxyTestResult } from '@/types'
 
 const { t } = useI18n()
-
-interface ProxyTestResult {
-  success: boolean
-  message: string
-  latency_ms?: number
-  ip_address?: string
-  city?: string
-  region?: string
-  country?: string
-}
 
 interface Props {
   modelValue: number | null
@@ -205,7 +195,7 @@ const searchQuery = ref('')
 const containerRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
-// Test state
+// 保存每个代理最近一次测试终态，用于列表内即时反馈。
 const testResults = reactive<Record<number, ProxyTestResult>>({})
 const testingProxyIds = reactive(new Set<number>())
 const batchTesting = ref(false)
@@ -261,6 +251,12 @@ const handleTestProxy = async (proxy: Proxy) => {
   } catch (error: any) {
     testResults[proxy.id] = {
       success: false,
+      status: 'failed',
+      stage: 'transport',
+      error_code: 'REQUEST_FAILED',
+      latency_ms: 0,
+      tested_at: new Date().toISOString(),
+      safe_to_schedule: false,
       message: error.response?.data?.detail || 'Test failed'
     }
   } finally {

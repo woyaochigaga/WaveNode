@@ -112,6 +112,14 @@ describe('ConnectionTestModal', () => {
       expect.stringContaining('/admin/groups/12/test'),
       expect.objectContaining({ method: 'POST' })
     )
+    expect(wrapper.emitted('result')).toHaveLength(1)
+    expect(wrapper.emitted('result')?.[0]?.[0]).toEqual(expect.objectContaining({
+      targetId: 12,
+      status: 'success',
+      model: 'claude-haiku-4-5',
+      durationMs: expect.any(Number),
+      testedAt: expect.any(String)
+    }))
   })
 
   it('reloads models and continues testing after the initial model request fails', async () => {
@@ -147,6 +155,60 @@ describe('ConnectionTestModal', () => {
     expect(wrapper.text()).toContain('common.connectionTest.success')
   })
 
+  it('explains why a group has no schedulable account', async () => {
+    getGroupTestModels.mockRejectedValueOnce({
+      status: 400,
+      reason: 'GROUP_TEST_NO_SCHEDULABLE_ACCOUNTS',
+      message: 'No schedulable accounts are available in this group'
+    })
+    const wrapper = mountModal()
+
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('common.connectionTest.errors.noSchedulableAccounts')
+
+    const copyButton = wrapper.findAll('button').find((button) =>
+      button.text().includes('common.connectionTest.copyOutput')
+    )
+    expect(copyButton).toBeDefined()
+    await copyButton!.trigger('click')
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      'common.connectionTest.errors.noSchedulableAccounts',
+      'common.connectionTest.outputCopied'
+    )
+  })
+
+  it('localizes a coded SSE model error', async () => {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(
+          'data: {"type":"error","code":"GROUP_TEST_MODEL_UNAVAILABLE","error":"raw error"}\n\n'
+        ))
+        controller.close()
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })))
+    const wrapper = mountModal()
+
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    const startButton = wrapper.findAll('button').find((button) =>
+      button.text().includes('common.connectionTest.start')
+    )
+    await startButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('common.connectionTest.errors.modelUnavailable')
+    expect(wrapper.text()).not.toContain('raw error')
+    expect(wrapper.emitted('result')?.[0]?.[0]).toEqual(expect.objectContaining({
+      targetId: 12,
+      status: 'error',
+      message: 'common.connectionTest.errors.modelUnavailable'
+    }))
+  })
+
   it('shows a localized API key preflight error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       code: 400,
@@ -173,5 +235,32 @@ describe('ConnectionTestModal', () => {
 
     expect(getKeyTestModels).toHaveBeenCalledWith(25)
     expect(wrapper.text()).toContain('common.connectionTest.errors.keyExpired')
+  })
+
+  it('stops a stalled upstream test after the client timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn((_url: string, options?: RequestInit) => new Promise((_, reject) => {
+      options?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'))
+      })
+    })))
+    const wrapper = mountModal()
+
+    await wrapper.setProps({ show: true })
+    await vi.runAllTicks()
+    await Promise.resolve()
+    const startButton = wrapper.findAll('button').find((button) =>
+      button.text().includes('common.connectionTest.start')
+    )
+    await startButton!.trigger('click')
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(wrapper.text()).toContain('common.connectionTest.timeout')
+    expect(wrapper.emitted('result')?.[0]?.[0]).toEqual(expect.objectContaining({
+      status: 'error',
+      durationMs: 60_000,
+      message: 'common.connectionTest.timeout'
+    }))
+    vi.useRealTimers()
   })
 })

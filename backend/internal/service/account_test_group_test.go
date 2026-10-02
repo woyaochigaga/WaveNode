@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -145,4 +146,63 @@ func TestAccountTestService_GetGroupTestModelsExcludesMediaAliases(t *testing.T)
 	require.NoError(t, err)
 	require.Contains(t, models, "fast-text")
 	require.NotContains(t, models, "fast-image")
+}
+
+func TestAccountTestService_GetGroupTestModelsReportsNoSchedulableAccounts(t *testing.T) {
+	service := &AccountTestService{accountRepo: &groupTestAccountRepo{}}
+
+	models, err := service.GetGroupTestModels(
+		context.Background(),
+		&Group{ID: 12, Platform: PlatformOpenAI},
+	)
+
+	require.Nil(t, models)
+	require.Equal(t, "GROUP_TEST_NO_SCHEDULABLE_ACCOUNTS", infraerrors.Reason(err))
+}
+
+func TestAccountTestService_GetGroupTestModelsReportsNoSupportedModels(t *testing.T) {
+	repo := &groupTestAccountRepo{accounts: []Account{
+		{
+			ID:          5,
+			Platform:    PlatformAnthropic,
+			Status:      StatusActive,
+			Schedulable: true,
+		},
+	}}
+	service := &AccountTestService{accountRepo: repo}
+
+	models, err := service.GetGroupTestModels(
+		context.Background(),
+		&Group{ID: 13, Platform: PlatformOpenAI},
+	)
+
+	require.Nil(t, models)
+	require.Equal(t, "GROUP_TEST_NO_SUPPORTED_MODELS", infraerrors.Reason(err))
+}
+
+func TestAccountTestService_TestGroupConnectionReturnsCodedModelError(t *testing.T) {
+	repo := &groupTestAccountRepo{accounts: []Account{
+		{
+			ID:          6,
+			Platform:    PlatformAnthropic,
+			Status:      StatusActive,
+			Schedulable: true,
+		},
+	}}
+	service := &AccountTestService{accountRepo: repo}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("POST", "/test", strings.NewReader(`{}`))
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = request
+
+	err := service.TestGroupConnection(
+		ctx,
+		&Group{ID: 14, Platform: PlatformOpenAI},
+		"unsupported-text-model",
+		"",
+		"",
+	)
+
+	require.Error(t, err)
+	require.Contains(t, recorder.Body.String(), `"code":"GROUP_TEST_MODEL_UNAVAILABLE"`)
 }

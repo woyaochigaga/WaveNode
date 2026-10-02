@@ -292,24 +292,6 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
 }
 
 /**
- * Test account connectivity
- * @param id - Account ID
- * @returns Test result
- */
-export async function testAccount(id: number): Promise<{
-  success: boolean
-  message: string
-  latency_ms?: number
-}> {
-  const { data } = await apiClient.post<{
-    success: boolean
-    message: string
-    latency_ms?: number
-  }>(`/admin/accounts/${id}/test`)
-  return data
-}
-
-/**
  * Refresh account credentials
  * @param id - Account ID
  * @returns Updated account
@@ -1144,7 +1126,6 @@ export const accountsAPI = {
   checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,
-  testAccount,
   refreshCredentials,
   applyOAuthCredentials,
   getStats,

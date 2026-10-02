@@ -28,6 +28,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -1302,8 +1303,17 @@ func (h *AccountHandler) Test(c *gin.Context) {
 		AudioDataURL: req.AudioDataURL,
 	}
 
-	// Use AccountTestService to test the account with SSE streaming
-	if err := h.accountTestService.TestAccountConnection(c, accountID, req.ModelID, req.Prompt, req.Mode, opts); err != nil {
+	// SSE 保持旧事件兼容，同时把终态摘要交给审计中间件记录。
+	result, err := h.accountTestService.TestAccountConnectionWithResult(c, accountID, req.ModelID, req.Prompt, req.Mode, opts)
+	if result != nil {
+		servermiddleware.SetAuditExtra(c, map[string]any{
+			"result":      result.Status,
+			"error_code":  result.ErrorCode,
+			"http_status": result.HTTPStatus,
+			"latency_ms":  result.LatencyMs,
+		})
+	}
+	if err != nil {
 		// Error already sent via SSE, just log
 		return
 	}

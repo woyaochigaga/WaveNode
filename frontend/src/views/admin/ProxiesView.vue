@@ -841,6 +841,100 @@
     />
 
     <BaseDialog
+      :show="showTestReportDialog"
+      :title="t('admin.proxies.testReportTitle')"
+      width="normal"
+      @close="closeTestReportDialog"
+    >
+      <div v-if="testReport" class="space-y-5" data-testid="proxy-test-report">
+        <div class="flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-dark-600">
+          <div class="min-w-0">
+            <p class="truncate text-sm text-gray-500 dark:text-gray-400">
+              {{ testReportProxy?.name || '-' }}
+            </p>
+            <div class="mt-2 flex items-center gap-2">
+              <span
+                class="h-2.5 w-2.5 rounded-full"
+                :class="testReport.status === 'success' ? 'bg-success-500' : 'bg-danger-500'"
+              ></span>
+              <p class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ proxyTestStatusLabel(testReport.status) }}
+              </p>
+            </div>
+          </div>
+          <span
+            class="badge whitespace-nowrap"
+            :class="testReport.safe_to_schedule ? 'badge-success' : 'badge-warning'"
+          >
+            {{
+              testReport.safe_to_schedule
+                ? t('admin.proxies.testSchedulable')
+                : t('admin.proxies.testNotSchedulable')
+            }}
+          </span>
+        </div>
+
+        <dl class="divide-y divide-gray-200 text-sm dark:divide-dark-600">
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
+            <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.proxies.testStage') }}</dt>
+            <dd class="text-right font-medium text-gray-900 dark:text-white">
+              {{ proxyTestStageLabel(testReport.stage) }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
+            <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.proxies.testLatency') }}</dt>
+            <dd class="text-right font-medium text-gray-900 dark:text-white">
+              {{ `${testReport.latency_ms}ms` }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
+            <dt class="text-gray-500 dark:text-gray-400">HTTP</dt>
+            <dd class="text-right font-medium text-gray-900 dark:text-white">
+              {{ testReport.http_status || '-' }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
+            <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.proxies.testedAt') }}</dt>
+            <dd class="text-right font-medium text-gray-900 dark:text-white">
+              {{ formatDateTime(testReport.tested_at) }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
+            <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.proxies.qualityExitIP') }}</dt>
+            <dd class="break-all text-right font-medium text-gray-900 dark:text-white">
+              {{ testReport.ip_address || '-' }}
+            </dd>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3">
+            <dt class="text-gray-500 dark:text-gray-400">{{ t('admin.proxies.testLocation') }}</dt>
+            <dd class="text-right font-medium text-gray-900 dark:text-white">
+              {{ formatTestReportLocation(testReport) }}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="border-l-2 border-primary-500 pl-4 text-sm">
+          <p class="font-medium text-gray-900 dark:text-white">
+            {{ proxyTestGuidance(testReport) }}
+          </p>
+          <p v-if="testReport.message" class="mt-1 break-words text-gray-600 dark:text-gray-300">
+            {{ testReport.message }}
+          </p>
+          <code v-if="testReport.error_code" class="mt-2 block text-xs text-gray-500 dark:text-gray-400">
+            {{ testReport.error_code }}
+          </code>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end">
+          <button @click="closeTestReportDialog" class="btn btn-secondary">
+            {{ t('common.close') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog
       :show="showQualityReportDialog"
       :title="t('admin.proxies.qualityReportTitle')"
       width="normal"
@@ -968,7 +1062,13 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
-import type { Proxy, ProxyAccountSummary, ProxyProtocol, ProxyQualityCheckResult } from '@/types'
+import type {
+  Proxy,
+  ProxyAccountSummary,
+  ProxyProtocol,
+  ProxyQualityCheckResult,
+  ProxyTestResult
+} from '@/types'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1100,6 +1200,10 @@ const proxyAccounts = ref<ProxyAccountSummary[]>([])
 const accountsLoading = ref(false)
 const editingProxy = ref<Proxy | null>(null)
 const deletingProxy = ref<Proxy | null>(null)
+// 单次连接测试的结构化结果；批量测试只更新表格，避免连续打断操作。
+const showTestReportDialog = ref(false)
+const testReportProxy = ref<Proxy | null>(null)
+const testReport = ref<ProxyTestResult | null>(null)
 const showQualityReportDialog = ref(false)
 const qualityReportProxy = ref<Proxy | null>(null)
 const qualityReport = ref<ProxyQualityCheckResult | null>(null)
@@ -1572,6 +1676,9 @@ const runProxyTest = async (proxyId: number, notify: boolean) => {
     const result = await adminAPI.proxies.testProxy(proxyId)
     applyLatencyResult(proxyId, result)
     if (notify) {
+      testReportProxy.value = proxies.value.find((proxy) => proxy.id === proxyId) || null
+      testReport.value = result
+      showTestReportDialog.value = true
       if (result.success) {
         const message = result.latency_ms
           ? t('admin.proxies.proxyWorkingWithLatency', { latency: result.latency_ms })
@@ -1584,12 +1691,26 @@ const runProxyTest = async (proxyId: number, notify: boolean) => {
     return result
   } catch (error: any) {
     const message = error.response?.data?.detail || t('admin.proxies.failedToTest')
-    applyLatencyResult(proxyId, { success: false, message })
+    // 请求本身失败时也生成同一结构，确保用户仍能获得可操作的诊断信息。
+    const result: ProxyTestResult = {
+      success: false,
+      status: 'failed',
+      stage: 'transport',
+      error_code: 'REQUEST_FAILED',
+      latency_ms: 0,
+      tested_at: new Date().toISOString(),
+      safe_to_schedule: false,
+      message
+    }
+    applyLatencyResult(proxyId, result)
     if (notify) {
+      testReportProxy.value = proxies.value.find((proxy) => proxy.id === proxyId) || null
+      testReport.value = result
+      showTestReportDialog.value = true
       appStore.showError(message)
     }
     console.error('Error testing proxy:', error)
-    return null
+    return result
   } finally {
     stopTestingProxy(proxyId)
   }
@@ -1696,6 +1817,53 @@ const closeQualityReportDialog = () => {
   showQualityReportDialog.value = false
   qualityReportProxy.value = null
   qualityReport.value = null
+}
+
+const closeTestReportDialog = () => {
+  showTestReportDialog.value = false
+  testReportProxy.value = null
+  testReport.value = null
+}
+
+const proxyTestStatusLabel = (status: ProxyTestResult['status']) => {
+  if (status === 'success') return t('admin.proxies.testStatusSuccess')
+  if (status === 'cancelled') return t('admin.proxies.testStatusCancelled')
+  return t('admin.proxies.testStatusFailed')
+}
+
+const proxyTestStageLabel = (stage: string) => {
+  const knownStages = new Set([
+    'complete',
+    'connect',
+    'proxy',
+    'dns',
+    'tls',
+    'rate_limit',
+    'upstream',
+    'transport',
+    'cancelled'
+  ])
+  return knownStages.has(stage) ? t(`admin.proxies.testStages.${stage}`) : stage || '-'
+}
+
+const proxyTestGuidance = (result: ProxyTestResult) => {
+  if (result.status === 'success') return t('admin.proxies.testGuidance.success')
+  const knownCodes = new Set([
+    'PROXY_AUTH_FAILED',
+    'DNS_RESOLUTION_FAILED',
+    'TLS_HANDSHAKE_FAILED',
+    'UPSTREAM_TIMEOUT',
+    'UPSTREAM_RATE_LIMITED',
+    'UPSTREAM_UNAVAILABLE',
+    'REQUEST_CANCELLED'
+  ])
+  const code = result.error_code || 'default'
+  return t(`admin.proxies.testGuidance.${knownCodes.has(code) ? code : 'default'}`)
+}
+
+const formatTestReportLocation = (result: ProxyTestResult) => {
+  const parts = [result.country, result.region, result.city].filter(Boolean)
+  return parts.join(' · ') || '-'
 }
 
 const qualityStatusClass = (status: string) => {

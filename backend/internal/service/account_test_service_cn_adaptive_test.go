@@ -273,7 +273,7 @@ func TestAccountTestService_AnthropicProtocolRejectsOpenAICompatBaseURL(t *testi
 	require.Contains(t, recorder.Body.String(), "https://open.bigmodel.cn/api/anthropic")
 }
 
-func TestAccountTestService_AnthropicProtocol401MarksAccountError(t *testing.T) {
+func TestAccountTestService_AnthropicProtocol401DoesNotPauseOnManualTest(t *testing.T) {
 	account := anthropicProtocolCNAccount(314, PlatformKimi, map[string]any{
 		"base_url": "https://api.moonshot.cn/anthropic",
 	})
@@ -288,5 +288,5 @@ func TestAccountTestService_AnthropicProtocol401MarksAccountError(t *testing.T) 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Anthropic endpoint returned 401")
 	repo := svc.accountRepo.(*openAIAccountTestRepo)
-	require.Equal(t, account.ID, repo.setErrorID)
+	require.Zero(t, repo.setErrorID)
 }

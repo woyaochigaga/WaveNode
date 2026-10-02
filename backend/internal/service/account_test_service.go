@@ -28,10 +28,12 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -63,6 +65,8 @@ type TestEvent struct {
 	Data     any    `json:"data,omitempty"`
 	Success  bool   `json:"success,omitempty"`
 	Error    string `json:"error,omitempty"`
+	// Result 只在 summary 终态事件中出现，旧客户端会自然忽略该新增字段。
+	Result *ConnectionTestResult `json:"result,omitempty"`
 }
 
 // AccountTestOptions carries optional media for admin connectivity tests.
@@ -70,6 +74,19 @@ type TestEvent struct {
 type AccountTestOptions struct {
 	ImageDataURL string
 	AudioDataURL string
+	// ApplyHealthPolicy 允许调用方显式把失败同步为调度冷却或永久错误；手动测试默认关闭。
+	ApplyHealthPolicy bool
+}
+
+type accountTestHealthPolicyContextKey struct{}
+
+// shouldApplyAccountTestHealthPolicy 对直接调用底层平台测试的内部代码保持旧行为；
+// 统一入口会明确写入 false，避免管理员手动测试意外暂停账号。
+func shouldApplyAccountTestHealthPolicy(ctx context.Context) bool {
+	if enabled, ok := ctx.Value(accountTestHealthPolicyContextKey{}).(bool); ok {
+		return enabled
+	}
+	return true
 }
 
 func firstAccountTestOptions(opts []AccountTestOptions) AccountTestOptions {
@@ -359,15 +376,35 @@ func createTestPayload(modelID string) (map[string]any, error) {
 // mode is optional - "compact" routes OpenAI accounts to the /responses/compact probe path
 // opts is optional media (image/audio data URLs for real generation / STT).
 func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string, mode string, opts ...AccountTestOptions) error {
-	ctx := c.Request.Context()
+	_, err := s.TestAccountConnectionWithResult(c, accountID, modelID, prompt, mode, opts...)
+	return err
+}
+
+// TestAccountConnectionWithResult 在保留原 SSE 流的同时返回统一终态结果，供审计和后台任务复用。
+func (s *AccountTestService) TestAccountConnectionWithResult(c *gin.Context, accountID int64, modelID string, prompt string, mode string, opts ...AccountTestOptions) (*ConnectionTestResult, error) {
+	startedAt := time.Now()
 	testOpts := firstAccountTestOptions(opts)
+	originalRequest := c.Request
+	ctx := context.WithValue(originalRequest.Context(), accountTestHealthPolicyContextKey{}, testOpts.ApplyHealthPolicy)
+	c.Request = originalRequest.WithContext(ctx)
+	defer func() { c.Request = originalRequest }()
 
 	// Get account
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
-		return s.sendErrorAndEnd(c, "Account not found")
+		testErr := s.sendErrorCodeAndEnd(c, "ACCOUNT_NOT_FOUND", "Account not found")
+		result := buildAccountConnectionTestResult(ctx, nil, startedAt, testErr)
+		s.sendEvent(c, TestEvent{Type: "summary", Result: result})
+		return result, testErr
 	}
 
+	err = s.testAccountConnection(c, account, modelID, prompt, mode, testOpts)
+	result := buildAccountConnectionTestResult(ctx, account, startedAt, err)
+	s.sendEvent(c, TestEvent{Type: "summary", Result: result})
+	return result, err
+}
+
+func (s *AccountTestService) testAccountConnection(c *gin.Context, account *Account, modelID, prompt, mode string, testOpts AccountTestOptions) error {
 	// Synthetic UI load-test accounts exercise the real SSE parsing and modal
 	// interactions, but intentionally do not send their placeholder credentials
 	// to an upstream provider.
@@ -433,6 +470,12 @@ func (s *AccountTestService) GetGroupTestModels(ctx context.Context, group *Grou
 	if err != nil {
 		return nil, fmt.Errorf("list schedulable group accounts: %w", err)
 	}
+	if len(accounts) == 0 {
+		return nil, infraerrors.BadRequest(
+			"GROUP_TEST_NO_SCHEDULABLE_ACCOUNTS",
+			"No schedulable accounts are available in this group",
+		)
+	}
 
 	candidates := defaultModelsListCandidateIDs(group.Platform)
 	if group.ModelAllowlistEnabled() {
@@ -486,6 +529,12 @@ func (s *AccountTestService) GetGroupTestModels(ctx context.Context, group *Grou
 			}
 		}
 	}
+	if len(models) == 0 {
+		return nil, infraerrors.BadRequest(
+			"GROUP_TEST_NO_SUPPORTED_MODELS",
+			"No schedulable account in this group supports a testable text model",
+		)
+	}
 	return models, nil
 }
 
@@ -503,15 +552,21 @@ func (s *AccountTestService) TestGroupConnection(c *gin.Context, group *Group, m
 	if modelID == "" {
 		models, err := s.GetGroupTestModels(c.Request.Context(), group)
 		if err != nil {
-			return s.sendErrorAndEnd(c, "Failed to load test models")
-		}
-		if len(models) == 0 {
-			return s.sendErrorAndEnd(c, "No testable model is currently available in this group")
+			reason := infraerrors.Reason(err)
+			message := infraerrors.Message(err)
+			if reason == "" {
+				message = "Failed to load test models"
+			}
+			return s.sendErrorCodeAndEnd(c, reason, message)
 		}
 		modelID = models[0]
 	}
 	if group.ModelAllowlistEnabled() && !group.ModelAllowlist.Allows(modelID) {
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Model %s is not allowed by this group", modelID))
+		return s.sendErrorCodeAndEnd(
+			c,
+			"GROUP_TEST_MODEL_NOT_ALLOWED",
+			fmt.Sprintf("Model %s is not allowed by this group", modelID),
+		)
 	}
 
 	accounts, err := s.accountRepo.ListSchedulableByGroupID(c.Request.Context(), group.ID)
@@ -526,7 +581,11 @@ func (s *AccountTestService) TestGroupConnection(c *gin.Context, group *Group, m
 		return s.TestAccountConnection(c, accounts[i].ID, modelID, prompt, mode)
 	}
 
-	return s.sendErrorAndEnd(c, fmt.Sprintf("No schedulable account supports model %s", modelID))
+	return s.sendErrorCodeAndEnd(
+		c,
+		"GROUP_TEST_MODEL_UNAVAILABLE",
+		fmt.Sprintf("No schedulable account supports model %s", modelID),
+	)
 }
 
 func groupTestAccountMatchesPlatform(groupPlatform string, account *Account) bool {
@@ -760,7 +819,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		errMsg := fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(body))
 
 		// 403 表示账号被上游封禁，标记为 error 状态
-		if resp.StatusCode == http.StatusForbidden {
+		if resp.StatusCode == http.StatusForbidden && shouldApplyAccountTestHealthPolicy(ctx) {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}
 
@@ -830,7 +889,7 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(body))
-		if resp.StatusCode == http.StatusForbidden {
+		if resp.StatusCode == http.StatusForbidden && shouldApplyAccountTestHealthPolicy(ctx) {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}
 		return s.sendErrorAndEnd(c, errMsg)
@@ -1125,7 +1184,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
 		}
 		// 401 Unauthorized: 标记账号为永久错误
-		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
+		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil && shouldApplyAccountTestHealthPolicy(ctx) {
 			errMsg := fmt.Sprintf("Authentication failed (401): %s", string(body))
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}
@@ -1324,16 +1383,16 @@ func (s *AccountTestService) observeGrokTestResponse(ctx context.Context, accoun
 		_ = s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{
 			grokQuotaSnapshotExtraKey: snapshot,
 		})
-		if limited {
+		if limited && shouldApplyAccountTestHealthPolicy(ctx) {
 			persistGrokRateLimit(ctx, s.accountRepo, account, resetAt)
-		} else if isSuccessfulGrokRateLimitRecovery(account, snapshot) {
+		} else if isSuccessfulGrokRateLimitRecovery(account, snapshot) && shouldApplyAccountTestHealthPolicy(ctx) {
 			clearGrokRateLimitAfterRecovery(ctx, s.accountRepo, account)
 		}
-	} else if s.accountRepo != nil && isSuccessfulGrokRateLimitRecovery(account, &xai.QuotaSnapshot{StatusCode: resp.StatusCode}) {
+	} else if s.accountRepo != nil && isSuccessfulGrokRateLimitRecovery(account, &xai.QuotaSnapshot{StatusCode: resp.StatusCode}) && shouldApplyAccountTestHealthPolicy(ctx) {
 		clearGrokRateLimitAfterRecovery(ctx, s.accountRepo, account)
 	}
 	if s.accountRepo == nil || len(responseBody) == 0 {
-		if resp.StatusCode == http.StatusPaymentRequired && s.accountRepo != nil {
+		if resp.StatusCode == http.StatusPaymentRequired && s.accountRepo != nil && shouldApplyAccountTestHealthPolicy(ctx) {
 			stateCtx, cancel := openAIAccountStateContext(ctx)
 			defer cancel()
 			_ = s.accountRepo.SetTempUnschedulable(stateCtx, account.ID, now.Add(30*time.Minute), "grok payment required")
@@ -1345,6 +1404,9 @@ func (s *AccountTestService) observeGrokTestResponse(ctx context.Context, accoun
 	}
 	decision := classifyGrokUpstreamFailure(resp.StatusCode, responseBody, "")
 	if decision.Class == GrokFailureFreeUsage {
+		if !shouldApplyAccountTestHealthPolicy(ctx) {
+			return
+		}
 		if resetAt, limited := grokRateLimitResetAtForAccount(account, snapshot, now); limited && resetAt.After(now) {
 			persistGrokRateLimit(ctx, s.accountRepo, account, resetAt)
 		} else {
@@ -1355,7 +1417,9 @@ func (s *AccountTestService) observeGrokTestResponse(ctx context.Context, accoun
 		return
 	}
 	if decision.Class == GrokFailureBilling && (isGrokSpendingLimitError(responseBody) || strings.Contains(strings.ToLower(decision.Reason), "credit")) {
-		persistGrokRateLimit(ctx, s.accountRepo, account, grokSpendingLimitResetAt(account, now))
+		if shouldApplyAccountTestHealthPolicy(ctx) {
+			persistGrokRateLimit(ctx, s.accountRepo, account, grokSpendingLimitResetAt(account, now))
+		}
 		return
 	}
 	cooldown := time.Duration(0)
@@ -1375,7 +1439,7 @@ func (s *AccountTestService) observeGrokTestResponse(ctx context.Context, accoun
 	if decision.Class == GrokFailureBilling && cooldown == 0 {
 		cooldown, reason = 30*time.Minute, "grok payment required"
 	}
-	if cooldown > 0 {
+	if cooldown > 0 && shouldApplyAccountTestHealthPolicy(ctx) {
 		stateCtx, cancel := openAIAccountStateContext(ctx)
 		defer cancel()
 		until := now.Add(cooldown)
@@ -2316,7 +2380,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 		if resp.StatusCode == http.StatusTooManyRequests {
 			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
 		}
-		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
+		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil && shouldApplyAccountTestHealthPolicy(ctx) {
 			errMsg := fmt.Sprintf("Chat Completions authentication failed (401): %s", string(body))
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}
@@ -2477,7 +2541,7 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
+		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil && shouldApplyAccountTestHealthPolicy(ctx) {
 			errMsg := fmt.Sprintf("Authentication failed (401): %s", string(body))
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}
@@ -2499,6 +2563,9 @@ func (s *AccountTestService) reconcileOpenAI429State(ctx context.Context, accoun
 	}
 
 	persistOpenAI429PlanType(ctx, s.accountRepo, account, body)
+	if !shouldApplyAccountTestHealthPolicy(ctx) {
+		return
+	}
 
 	var resetAt *time.Time
 	if calculated := calculateOpenAI429ResetTime(headers); calculated != nil {
@@ -3430,9 +3497,15 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 
 // sendErrorAndEnd sends an error event and ends the stream
 func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) error {
-	log.Printf("Account test error: %s", errorMsg)
-	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
-	return fmt.Errorf("%s", errorMsg)
+	return s.sendErrorCodeAndEnd(c, "", errorMsg)
+}
+
+// sendErrorCodeAndEnd 为可操作的测试错误附带稳定错误码，便于前端给出本地化处理建议。
+func (s *AccountTestService) sendErrorCodeAndEnd(c *gin.Context, code, errorMsg string) error {
+	failure := newConnectionTestFailure(c.Request.Context(), code, logredact.RedactText(errorMsg))
+	log.Printf("Account test error: %s", failure.Message)
+	s.sendEvent(c, TestEvent{Type: "error", Code: failure.Code, Error: failure.Message})
+	return failure
 }
 
 // RunTestBackground executes an account test in-memory (no real HTTP client),
@@ -3444,17 +3517,16 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 	ginCtx, _ := gin.CreateTestContext(w)
 	ginCtx.Request = (&http.Request{}).WithContext(ctx)
 
-	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, "", AccountTestModeDefault)
+	connectionResult, testErr := s.TestAccountConnectionWithResult(ginCtx, accountID, modelID, "", AccountTestModeDefault)
 
 	finishedAt := time.Now()
 	body := w.Body.String()
 	responseText, errMsg := parseTestSSEOutput(body)
 
-	status := "success"
+	status := connectionResult.Status
 	if testErr != nil || errMsg != "" {
-		status = "failed"
 		if errMsg == "" && testErr != nil {
-			errMsg = testErr.Error()
+			errMsg = connectionResult.Message
 		}
 	}
 

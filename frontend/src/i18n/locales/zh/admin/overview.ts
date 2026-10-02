@@ -126,6 +126,24 @@ export default {
     backup: {
       title: '数据库备份',
       description: '全量数据库备份到 S3 兼容存储，支持定时备份与恢复',
+      preflight: {
+        title: '迁移与恢复检查',
+        description: '汇总数据库、迁移版本、Redis、磁盘、密钥、未结算任务与最近已演练备份。',
+        ready: '可以继续',
+        blocked: '存在阻断项',
+        refresh: '重新检查',
+        status: { pass: '通过', warn: '提醒', fail: '阻断' },
+        checks: {
+          database: '数据库',
+          migration: '迁移版本',
+          postgres_tools: 'PostgreSQL 工具',
+          unsettled_tasks: '未结算任务',
+          encryption_key: '固定加密密钥',
+          redis: 'Redis',
+          disk: '临时磁盘',
+          backup_age: '最近已演练备份'
+        }
+      },
       s3: {
         title: 'S3 存储配置',
         description: '配置 S3 兼容存储（支持 Cloudflare R2）',
@@ -214,9 +232,13 @@ export default {
         backupFailed: '备份失败',
         restoreRunning: '恢复进行中...',
         restoreFailed: '恢复失败',
+        verificationRunning: '恢复演练仍在进行中...',
+        verificationPassed: '恢复演练已通过',
+        verificationFailed: '恢复演练失败',
       },
       columns: {
         status: '状态',
+        recovery: '可恢复性',
         fileName: '文件名',
         size: '大小',
         parts: '分卷数',
@@ -230,6 +252,12 @@ export default {
         running: '执行中',
         completed: '已完成',
         failed: '失败'
+      },
+      verification: {
+        pending: '未演练',
+        running: '演练中',
+        passed: '已验证',
+        failed: '演练失败'
       },
       progress: {
         pending: '准备中',
@@ -249,6 +277,10 @@ export default {
         partLabel: '第 {index} 卷',
         downloadFailed: '下载地址为空',
         restore: '恢复',
+        verify: '恢复演练',
+        verifying: '演练中...',
+        verifyConfirm: '将在临时 PostgreSQL 数据库中恢复此备份并执行完整性检查，是否继续？',
+        restoreRequiresVerification: '请先完成恢复演练，演练通过后才能恢复生产数据库。',
         restoreConfirm: '确定要从此备份恢复吗？这将覆盖当前数据库！',
         restorePasswordPrompt: '请输入管理员密码以确认恢复操作',
         restoreSuccess: '数据库恢复成功',

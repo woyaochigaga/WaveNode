@@ -224,6 +224,70 @@
         </button>
       </div>
 
+      <!-- 终态摘要使用单一信息带，帮助管理员快速判断失败阶段和调度影响。 -->
+      <section
+        v-if="testSummary"
+        class="border-y border-gray-200 py-3 dark:border-dark-600"
+        data-testid="connection-test-summary"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <Icon
+              :name="testSummary.status === 'success' ? 'checkCircle' : 'exclamationTriangle'"
+              size="sm"
+              :class="testSummary.status === 'success' ? 'text-emerald-500' : 'text-red-500'"
+            />
+            <span class="font-medium text-gray-900 dark:text-gray-100">
+              {{ connectionStatusLabel(testSummary.status) }}
+            </span>
+          </div>
+          <span class="text-xs text-gray-500 dark:text-gray-400">
+            {{ formatTestedAt(testSummary.tested_at) }}
+          </span>
+        </div>
+
+        <dl class="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+          <div>
+            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.testSummary.stage') }}</dt>
+            <dd class="mt-0.5 font-medium text-gray-800 dark:text-gray-200">
+              {{ connectionStageLabel(testSummary.stage) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.testSummary.latency') }}</dt>
+            <dd class="mt-0.5 font-medium text-gray-800 dark:text-gray-200">
+              {{ testSummary.latency_ms }}ms
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-gray-500 dark:text-gray-400">HTTP</dt>
+            <dd class="mt-0.5 font-medium text-gray-800 dark:text-gray-200">
+              {{ testSummary.http_status || '-' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.testSummary.scheduling') }}</dt>
+            <dd
+              class="mt-0.5 font-medium"
+              :class="testSummary.safe_to_schedule ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
+            >
+              {{
+                testSummary.safe_to_schedule
+                  ? t('admin.accounts.testSummary.schedulable')
+                  : t('admin.accounts.testSummary.notSchedulable')
+              }}
+            </dd>
+          </div>
+        </dl>
+
+        <p class="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">
+          {{ connectionTestGuidance(testSummary) }}
+          <span v-if="testSummary.error_code" class="ml-1 font-mono text-xs text-gray-400">
+            {{ testSummary.error_code }}
+          </span>
+        </p>
+      </section>
+
       <div v-if="generatedImages.length > 0" class="space-y-2">
         <div class="text-xs font-medium text-gray-600 dark:text-gray-300">
           {{ t('admin.accounts.imagePreview') }}
@@ -375,7 +439,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
 import { adminAPI } from '@/api/admin'
-import type { Account, ClaudeModel } from '@/types'
+import type { Account, ClaudeModel, ConnectionTestResult, ConnectionTestStatus } from '@/types'
 
 const { t } = useI18n()
 const { copyToClipboard } = useClipboard()
@@ -404,6 +468,7 @@ const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
 const outputLines = ref<OutputLine[]>([])
 const streamingContent = ref('')
 const errorMessage = ref('')
+const testSummary = ref<ConnectionTestResult | null>(null)
 const availableModels = ref<ClaudeModel[]>([])
 const selectedModelId = ref('')
 const testPrompt = ref('')
@@ -795,6 +860,7 @@ const resetState = () => {
   outputLines.value = []
   streamingContent.value = ''
   errorMessage.value = ''
+  testSummary.value = null
   generatedImages.value = []
   generatedAudios.value = []
   generatedVideos.value = []
@@ -948,6 +1014,7 @@ const handleEvent = (event: {
   audio_url?: string
   video_url?: string
   mime_type?: string
+  result?: ConnectionTestResult
 }) => {
   switch (event.type) {
     case 'test_start':
@@ -1036,6 +1103,15 @@ const handleEvent = (event: {
       }
       break
 
+    case 'summary':
+      if (!event.result) break
+      testSummary.value = event.result
+      status.value = event.result.status === 'success' ? 'success' : 'error'
+      if (event.result.status !== 'success') {
+        errorMessage.value = event.result.message || t('admin.accounts.testFailed')
+      }
+      break
+
     case 'error':
       status.value = 'error'
       errorMessage.value = event.error || t('common.unknownError')
@@ -1045,6 +1121,38 @@ const handleEvent = (event: {
       }
       break
   }
+}
+
+const connectionStatusLabel = (value: ConnectionTestStatus) =>
+  t(`admin.accounts.testSummary.status.${value}`)
+
+const connectionStageLabel = (stage: string) => {
+  const knownStages = ['complete', 'lookup', 'routing', 'credentials', 'proxy', 'dns', 'tls', 'transport', 'rate_limit', 'upstream', 'cancelled']
+  return knownStages.includes(stage)
+    ? t(`admin.accounts.testSummary.stages.${stage}`)
+    : stage || t('admin.accounts.testSummary.stages.upstream')
+}
+
+// 错误码决定面向管理员的处理建议，原始上游文本只作为补充，不参与业务判断。
+const connectionTestGuidance = (result: ConnectionTestResult) => {
+  if (result.status === 'success') return t('admin.accounts.testSummary.guidance.success')
+  const guidanceByCode: Record<string, string> = {
+    UPSTREAM_UNAUTHORIZED: 'credentials',
+    UPSTREAM_FORBIDDEN: 'permissions',
+    UPSTREAM_RATE_LIMITED: 'rateLimit',
+    PROXY_AUTH_FAILED: 'proxyAuth',
+    DNS_RESOLUTION_FAILED: 'dns',
+    TLS_HANDSHAKE_FAILED: 'tls',
+    UPSTREAM_TIMEOUT: 'timeout',
+    REQUEST_CANCELLED: 'cancelled'
+  }
+  const key = guidanceByCode[result.error_code || ''] || 'generic'
+  return t(`admin.accounts.testSummary.guidance.${key}`)
+}
+
+const formatTestedAt = (value: string) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
 }
 
 const copyOutput = () => {

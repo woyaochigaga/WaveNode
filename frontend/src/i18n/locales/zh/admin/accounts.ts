@@ -1629,6 +1629,43 @@ export default {
       audioReceived: '已收到第 {count} 段测试音频',
       videoPreview: '生成视频：',
       videoReceived: '已收到第 {count} 段测试视频',
+      testSummary: {
+        stage: '检测阶段',
+        latency: '总耗时',
+        scheduling: '调度状态',
+        schedulable: '可以继续调度',
+        notSchedulable: '暂不建议调度',
+        status: {
+          success: '连接正常',
+          failed: '连接失败',
+          cancelled: '测试已取消'
+        },
+        stages: {
+          complete: '全部完成',
+          lookup: '读取账号',
+          routing: '选择上游',
+          credentials: '校验凭证',
+          proxy: '连接代理',
+          dns: '解析域名',
+          tls: '建立安全连接',
+          transport: '等待上游响应',
+          rate_limit: '上游限流',
+          upstream: '上游处理',
+          cancelled: '客户端取消'
+        },
+        guidance: {
+          success: '凭证和上游链路均已验证，可以正常使用。',
+          credentials: '上游不接受当前凭证，请重新授权或更换 API Key 后再试。',
+          permissions: '凭证有效，但当前账号没有访问所选模型或服务的权限。',
+          rateLimit: '上游正在限流，等待限流窗口恢复后再试，不需要重复修改凭证。',
+          proxyAuth: '代理拒绝了认证，请检查代理用户名和密码。',
+          dns: '服务器无法解析上游域名，请检查 DNS、代理出口和网络配置。',
+          tls: '安全连接校验失败，请检查证书、系统时间和代理中间人配置。',
+          timeout: '上游长时间没有响应，请检查代理质量或稍后重试。',
+          cancelled: '测试由当前页面取消，不能据此判断账号不可用。',
+          generic: '连接未完成，请结合上方错误信息检查账号、代理和上游服务状态。'
+        }
+      },
       // Stats Modal
       viewStats: '查看统计',
       usageStatistics: '使用统计',

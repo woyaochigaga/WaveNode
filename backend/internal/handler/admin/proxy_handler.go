@@ -8,6 +8,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -252,7 +253,6 @@ func (h *ProxyHandler) BatchDelete(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-
 	response.Success(c, result)
 }
 
@@ -270,6 +270,12 @@ func (h *ProxyHandler) Test(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	servermiddleware.SetAuditExtra(c, map[string]any{
+		"result":      result.Status,
+		"error_code":  result.ErrorCode,
+		"http_status": result.HTTPStatus,
+		"latency_ms":  result.LatencyMs,
+	})
 
 	response.Success(c, result)
 }

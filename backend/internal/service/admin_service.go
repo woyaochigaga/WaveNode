@@ -573,9 +573,9 @@ type ProxyBatchDeleteSkipped struct {
 
 // ProxyTestResult represents the result of testing a proxy
 type ProxyTestResult struct {
+	// ConnectionTestResult 以内嵌方式追加结构化字段，保留旧版 success/message/latency_ms JSON 契约。
+	ConnectionTestResult
 	Success     bool   `json:"success"`
-	Message     string `json:"message"`
-	LatencyMs   int64  `json:"latency_ms,omitempty"`
 	IPAddress   string `json:"ip_address,omitempty"`
 	City        string `json:"city,omitempty"`
 	Region      string `json:"region,omitempty"`

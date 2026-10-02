@@ -220,4 +220,27 @@ describe('AccountTestModal', () => {
       mode: 'compact'
     })
   })
+
+  it('接收 summary 事件后展示结构化失败原因和调度建议', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"error","error":"unauthorized"}\n',
+        'data: {"type":"summary","result":{"status":"failed","stage":"credentials","error_code":"UPSTREAM_UNAUTHORIZED","http_status":401,"latency_ms":82,"tested_at":"2026-10-02T01:02:03Z","safe_to_schedule":false,"message":"unauthorized"}}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    const summary = wrapper.get('[data-testid="connection-test-summary"]')
+    expect(summary.text()).toContain('admin.accounts.testSummary.status.failed')
+    expect(summary.text()).toContain('admin.accounts.testSummary.stages.credentials')
+    expect(summary.text()).toContain('401')
+    expect(summary.text()).toContain('82ms')
+    expect(summary.text()).toContain('UPSTREAM_UNAUTHORIZED')
+    expect(summary.text()).toContain('admin.accounts.testSummary.notSchedulable')
+  })
 })

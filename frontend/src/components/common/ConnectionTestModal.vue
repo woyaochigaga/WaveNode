@@ -88,7 +88,7 @@
       <div class="flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
         <span>{{ t('common.connectionTest.actualUpstreamHint') }}</span>
         <button
-          v-if="outputLines.length || streamingContent"
+          v-if="hasCopyableOutput"
           type="button"
           class="inline-flex shrink-0 items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-300"
           @click="copyOutput"
@@ -147,8 +147,18 @@ interface TestEvent {
   text?: string
   model?: string
   status?: string
+  code?: string
   success?: boolean
   error?: string
+}
+
+interface ConnectionTestResult {
+  targetId: number
+  status: 'success' | 'error'
+  model: string
+  durationMs: number
+  testedAt: string
+  message?: string
 }
 
 const props = defineProps<{
@@ -160,6 +170,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'close'): void
+  (event: 'result', result: ConnectionTestResult): void
 }>()
 
 const { t } = useI18n()
@@ -173,6 +184,12 @@ const outputLines = ref<OutputLine[]>([])
 const streamingContent = ref('')
 const errorMessage = ref('')
 let abortController: AbortController | null = null
+let requestTimedOut = false
+let requestTimeout: ReturnType<typeof setTimeout> | null = null
+let testStartedAt: number | null = null
+let resultEmitted = false
+
+const connectionTestTimeoutMs = 60_000
 
 const modelOptions = computed(() =>
   availableModels.value.map((model) => ({ value: model, label: model }))
@@ -193,6 +210,9 @@ const actionLabel = computed(() => {
   if (status.value === 'idle') return t('common.connectionTest.start')
   return t('common.connectionTest.retry')
 })
+const hasCopyableOutput = computed(
+  () => Boolean(outputLines.value.length || streamingContent.value || errorMessage.value)
+)
 
 // 接口只返回当前至少有一个可调度账号支持的模型。
 const loadModels = async () => {
@@ -230,11 +250,15 @@ const resetOutput = () => {
   outputLines.value = []
   streamingContent.value = ''
   errorMessage.value = ''
+  testStartedAt = null
+  resultEmitted = false
 }
 
 const abortStream = () => {
   abortController?.abort()
   abortController = null
+  if (requestTimeout) clearTimeout(requestTimeout)
+  requestTimeout = null
 }
 
 const handleClose = () => {
@@ -257,10 +281,26 @@ const setError = (message: string) => {
   errorMessage.value = message
 }
 
+// 只上报真实测试请求的最终结果，供调用页面显示最近一次健康状态。
+const emitTestResult = (resultStatus: 'success' | 'error', message?: string) => {
+  if (resultEmitted || !props.targetId || testStartedAt === null) return
+  resultEmitted = true
+  emit('result', {
+    targetId: props.targetId,
+    status: resultStatus,
+    model: String(selectedModel.value || ''),
+    durationMs: Math.max(0, Date.now() - testStartedAt),
+    testedAt: new Date().toISOString(),
+    message
+  })
+}
+
 const readErrorMessage = (error: unknown): string => {
   if (typeof error === 'object' && error && 'message' in error) {
-    const requestError = error as { message?: unknown; status?: unknown }
+    const requestError = error as { message?: unknown; reason?: unknown; status?: unknown }
     const message = String(requestError.message || t('common.unknownError'))
+    const localizedMessage = localizeTestError(requestError.reason, message)
+    if (localizedMessage !== message) return localizedMessage
     if (requestError.status === 404 && /^Request failed with status code 404$/i.test(message)) {
       return t('common.connectionTest.endpointUnavailable')
     }
@@ -272,9 +312,10 @@ const readErrorMessage = (error: unknown): string => {
 const readHTTPError = async (response: Response): Promise<string> => {
   try {
     const payload = await response.json() as { message?: string; reason?: string }
-    const localizedKey = payload.reason ? testErrorTranslationKeys[payload.reason] : undefined
-    if (localizedKey) return t(localizedKey)
-    return payload.message || t('common.connectionTest.requestFailed', { status: response.status })
+    return localizeTestError(
+      payload.reason,
+      payload.message || t('common.connectionTest.requestFailed', { status: response.status })
+    )
   } catch {
     return t('common.connectionTest.requestFailed', { status: response.status })
   }
@@ -282,11 +323,21 @@ const readHTTPError = async (response: Response): Promise<string> => {
 
 const testErrorTranslationKeys: Record<string, string> = {
   GROUP_TEST_DISABLED: 'common.connectionTest.errors.groupDisabled',
+  GROUP_TEST_NO_SCHEDULABLE_ACCOUNTS: 'common.connectionTest.errors.noSchedulableAccounts',
+  GROUP_TEST_NO_SUPPORTED_MODELS: 'common.connectionTest.errors.noSupportedModels',
+  GROUP_TEST_MODEL_NOT_ALLOWED: 'common.connectionTest.errors.modelNotAllowed',
+  GROUP_TEST_MODEL_UNAVAILABLE: 'common.connectionTest.errors.modelUnavailable',
   API_KEY_TEST_DISABLED: 'common.connectionTest.errors.keyDisabled',
   API_KEY_TEST_EXPIRED: 'common.connectionTest.errors.keyExpired',
   API_KEY_TEST_QUOTA_EXHAUSTED: 'common.connectionTest.errors.quotaExhausted',
   API_KEY_TEST_GROUP_REQUIRED: 'common.connectionTest.errors.groupRequired',
   API_KEY_TEST_GROUP_DISABLED: 'common.connectionTest.errors.groupDisabled'
+}
+
+const localizeTestError = (reason: unknown, fallback: string): string => {
+  if (typeof reason !== 'string') return fallback
+  const localizedKey = testErrorTranslationKeys[reason]
+  return localizedKey ? t(localizedKey) : fallback
 }
 
 const handleEvent = (event: TestEvent) => {
@@ -316,13 +367,19 @@ const handleEvent = (event: TestEvent) => {
       }
       if (event.success) {
         status.value = 'success'
+        emitTestResult('success')
       } else {
-        setError(event.error || t('common.connectionTest.failed'))
+        const message = event.error || t('common.connectionTest.failed')
+        setError(message)
+        emitTestResult('error', message)
       }
       break
-    case 'error':
-      setError(event.error || t('common.connectionTest.failed'))
+    case 'error': {
+      const message = localizeTestError(event.code, event.error || t('common.connectionTest.failed'))
+      setError(message)
+      emitTestResult('error', message)
       break
+    }
   }
 }
 
@@ -330,10 +387,16 @@ const handleEvent = (event: TestEvent) => {
 const startTest = async () => {
   if (!props.targetId || !selectedModel.value || status.value === 'connecting') return
   resetOutput()
+  testStartedAt = Date.now()
   status.value = 'connecting'
   addLine(t('common.connectionTest.starting', { name: props.targetName }), 'text-blue-300')
   abortStream()
   abortController = new AbortController()
+  requestTimedOut = false
+  requestTimeout = setTimeout(() => {
+    requestTimedOut = true
+    abortController?.abort()
+  }, connectionTestTimeoutMs)
 
   const path = props.targetType === 'group'
     ? `/admin/groups/${props.targetId}/test`
@@ -382,14 +445,25 @@ const startTest = async () => {
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      if (requestTimedOut) {
+        const message = t('common.connectionTest.timeout')
+        setError(message)
+        addLine(message, 'text-red-300')
+        emitTestResult('error', message)
+        return
+      }
       status.value = 'idle'
       return
     }
     const message = readErrorMessage(error)
     setError(message)
     addLine(message, 'text-red-300')
+    emitTestResult('error', message)
   } finally {
     abortController = null
+    if (requestTimeout) clearTimeout(requestTimeout)
+    requestTimeout = null
+    requestTimedOut = false
   }
 }
 
@@ -404,8 +478,13 @@ const handlePrimaryAction = async () => {
 }
 
 const copyOutput = () => {
-  const content = [...outputLines.value.map((line) => line.text), streamingContent.value]
+  const content = [
+    ...outputLines.value.map((line) => line.text),
+    streamingContent.value,
+    errorMessage.value
+  ]
     .filter(Boolean)
+    .filter((line, index, lines) => lines.indexOf(line) === index)
     .join('\n')
   copyToClipboard(content, t('common.connectionTest.outputCopied'))
 }

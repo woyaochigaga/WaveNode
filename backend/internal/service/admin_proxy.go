@@ -213,23 +213,27 @@ func (s *adminServiceImpl) CheckProxyExists(ctx context.Context, host string, po
 }
 
 func (s *adminServiceImpl) TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error) {
+	startedAt := time.Now()
 	proxy, err := s.proxyRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
+	if s.proxyProber == nil {
+		failure := newConnectionTestFailure(ctx, "PROXY_PROBER_UNAVAILABLE", "Proxy probe service is unavailable")
+		return newProxyTestFailureResult(proxy, startedAt, 0, failure), nil
+	}
+
 	proxyURL := proxy.URL()
 	exitInfo, latencyMs, err := s.proxyProber.ProbeProxy(ctx, proxyURL)
 	if err != nil {
+		failure := classifyConnectionTestFailure(ctx, err, "")
 		s.saveProxyLatency(ctx, id, &ProxyLatencyInfo{
 			Success:   false,
-			Message:   err.Error(),
+			Message:   failure.Message,
 			UpdatedAt: time.Now(),
 		})
-		return &ProxyTestResult{
-			Success: false,
-			Message: err.Error(),
-		}, nil
+		return newProxyTestFailureResult(proxy, startedAt, latencyMs, failure), nil
 	}
 
 	latency := latencyMs
@@ -245,15 +249,46 @@ func (s *adminServiceImpl) TestProxy(ctx context.Context, id int64) (*ProxyTestR
 		UpdatedAt:   time.Now(),
 	})
 	return &ProxyTestResult{
+		ConnectionTestResult: ConnectionTestResult{
+			Status:         ConnectionTestStatusSuccess,
+			Stage:          "complete",
+			LatencyMs:      latencyMs,
+			TestedAt:       time.Now().UTC(),
+			SafeToSchedule: proxy.IsActive() && !proxy.IsExpired(time.Now()),
+			Message:        "Proxy is accessible",
+		},
 		Success:     true,
-		Message:     "Proxy is accessible",
-		LatencyMs:   latencyMs,
 		IPAddress:   exitInfo.IP,
 		City:        exitInfo.City,
 		Region:      exitInfo.Region,
 		Country:     exitInfo.Country,
 		CountryCode: exitInfo.CountryCode,
 	}, nil
+}
+
+// newProxyTestFailureResult 将探测器错误转换为前端可直接解释的稳定结果。
+func newProxyTestFailureResult(proxy *Proxy, startedAt time.Time, latencyMs int64, failure *connectionTestFailure) *ProxyTestResult {
+	if latencyMs <= 0 {
+		latencyMs = time.Since(startedAt).Milliseconds()
+	}
+	result := &ProxyTestResult{
+		ConnectionTestResult: ConnectionTestResult{
+			Status:         ConnectionTestStatusFailed,
+			Stage:          failure.Stage,
+			ErrorCode:      failure.Code,
+			HTTPStatus:     failure.HTTPStatus,
+			LatencyMs:      latencyMs,
+			TestedAt:       time.Now().UTC(),
+			SafeToSchedule: false,
+			Message:        failure.Message,
+		},
+		Success: false,
+	}
+	if failure.Code == "REQUEST_CANCELLED" {
+		result.Status = ConnectionTestStatusCancelled
+		result.SafeToSchedule = proxy != nil && proxy.IsActive() && !proxy.IsExpired(time.Now())
+	}
+	return result
 }
 
 func (s *adminServiceImpl) CheckProxyQuality(ctx context.Context, id int64) (*ProxyQualityCheckResult, error) {

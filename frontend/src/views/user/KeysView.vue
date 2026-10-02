@@ -395,11 +395,19 @@
               <!-- API Key 连接测试入口 -->
               <button
                 data-testid="key-test-connection"
+                :title="connectionTestResultTitle(row.id)"
                 @click="openConnectionTest(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                :class="[
+                  'flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors',
+                  keyConnectionTestResults.get(row.id)?.status === 'success'
+                    ? 'text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20'
+                    : keyConnectionTestResults.get(row.id)?.status === 'error'
+                      ? 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+                      : 'text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400'
+                ]"
               >
-                <Icon name="play" size="sm" />
-                <span class="text-xs">{{ t('keys.testConnection') }}</span>
+                <Icon :name="connectionTestResultIcon(row.id)" size="sm" />
+                <span class="whitespace-nowrap text-xs">{{ connectionTestResultLabel(row.id) }}</span>
               </button>
               <!-- Use Key Button -->
               <button
@@ -1094,6 +1102,7 @@
       :target-id="testingKey?.id ?? null"
       :target-name="testingKey?.name ?? ''"
       @close="closeConnectionTest"
+      @result="handleConnectionTestResult"
     />
 
     <!-- CCS Client Selection Dialog for Antigravity -->
@@ -1424,6 +1433,15 @@ const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const testingKey = ref<ApiKey | null>(null)
+interface ConnectionTestResult {
+  targetId: number
+  status: 'success' | 'error'
+  model: string
+  durationMs: number
+  testedAt: string
+  message?: string
+}
+const keyConnectionTestResults = reactive(new Map<number, ConnectionTestResult>())
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1693,6 +1711,50 @@ const openConnectionTest = (key: ApiKey) => {
 const closeConnectionTest = () => {
   showConnectionTest.value = false
   testingKey.value = null
+}
+
+// 最近一次结果只在当前页面保留，重新测试会覆盖同一密钥的旧状态。
+const handleConnectionTestResult = (result: ConnectionTestResult) => {
+  keyConnectionTestResults.set(result.targetId, result)
+}
+
+const formatConnectionTestDuration = (durationMs: number) =>
+  durationMs < 1000
+    ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`
+
+const connectionTestResultLabel = (keyId: number) => {
+  const result = keyConnectionTestResults.get(keyId)
+  if (!result) return t('keys.testConnection')
+  return t(
+    result.status === 'success'
+      ? 'common.connectionTest.lastPassed'
+      : 'common.connectionTest.lastFailed',
+    { duration: formatConnectionTestDuration(result.durationMs) }
+  )
+}
+
+const connectionTestResultIcon = (keyId: number) => {
+  const status = keyConnectionTestResults.get(keyId)?.status
+  if (status === 'success') return 'checkCircle'
+  if (status === 'error') return 'xCircle'
+  return 'play'
+}
+
+const connectionTestResultTitle = (keyId: number) => {
+  const result = keyConnectionTestResults.get(keyId)
+  if (!result) return t('keys.testConnection')
+  return t(
+    result.status === 'success'
+      ? 'common.connectionTest.lastSuccessTitle'
+      : 'common.connectionTest.lastFailureTitle',
+    {
+      model: result.model,
+      duration: formatConnectionTestDuration(result.durationMs),
+      time: formatDateTime(result.testedAt),
+      message: result.message || t('common.connectionTest.failed')
+    }
+  )
 }
 
 const closeUseKeyModal = () => {

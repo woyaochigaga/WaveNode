@@ -429,6 +429,21 @@ export interface ProxyNode {
   updated_at: string
 }
 
+export type ConnectionTestStatus = 'success' | 'failed' | 'cancelled'
+
+// 账号与代理测试共用的机器可读终态，前端不再依赖英文错误文本猜测结果。
+export interface ConnectionTestResult {
+  status: ConnectionTestStatus
+  stage: string
+  error_code?: string
+  http_status?: number
+  latency_ms: number
+  tested_at: string
+  credential_expires_at?: string
+  safe_to_schedule: boolean
+  message?: string
+}
+
 // ==================== Conversion Types ====================
 
 export interface ConversionRequest {
@@ -960,6 +975,15 @@ export interface Proxy {
   expiry_warn_days: number
   created_at: string
   updated_at: string
+}
+
+export interface ProxyTestResult extends ConnectionTestResult {
+  success: boolean
+  ip_address?: string
+  city?: string
+  region?: string
+  country?: string
+  country_code?: string
 }
 
 export interface ProxyAccountSummary {

@@ -126,6 +126,24 @@ export default {
     backup: {
       title: 'Database Backup',
       description: 'Full database backup to S3-compatible storage with scheduled backup and restore',
+      preflight: {
+        title: 'Migration and recovery checks',
+        description: 'Checks the database, migration version, Redis, disk, encryption key, unsettled tasks, and latest verified backup.',
+        ready: 'Ready',
+        blocked: 'Blocked',
+        refresh: 'Run checks',
+        status: { pass: 'Passed', warn: 'Review', fail: 'Blocked' },
+        checks: {
+          database: 'Database',
+          migration: 'Migration version',
+          postgres_tools: 'PostgreSQL tools',
+          unsettled_tasks: 'Unsettled tasks',
+          encryption_key: 'Persistent encryption key',
+          redis: 'Redis',
+          disk: 'Temporary disk',
+          backup_age: 'Latest verified backup'
+        }
+      },
       s3: {
         title: 'S3 Storage Configuration',
         description: 'Configure S3-compatible storage (supports Cloudflare R2)',
@@ -214,9 +232,13 @@ export default {
         backupFailed: 'Backup failed',
         restoreRunning: 'Restore in progress...',
         restoreFailed: 'Restore failed',
+        verificationRunning: 'Recovery verification is still running...',
+        verificationPassed: 'Recovery verification passed',
+        verificationFailed: 'Recovery verification failed',
       },
       columns: {
         status: 'Status',
+        recovery: 'Recoverability',
         fileName: 'File Name',
         size: 'Size',
         parts: 'Parts',
@@ -229,6 +251,12 @@ export default {
         pending: 'Pending',
         running: 'Running',
         completed: 'Completed',
+        failed: 'Failed'
+      },
+      verification: {
+        pending: 'Not verified',
+        running: 'Verifying',
+        passed: 'Verified',
         failed: 'Failed'
       },
       progress: {
@@ -249,6 +277,10 @@ export default {
         partLabel: 'Part {index}',
         downloadFailed: 'Download URL is empty',
         restore: 'Restore',
+        verify: 'Verify recovery',
+        verifying: 'Verifying...',
+        verifyConfirm: 'Restore this backup into a temporary PostgreSQL database and run integrity checks?',
+        restoreRequiresVerification: 'Run and pass recovery verification before restoring the production database.',
         restoreConfirm: 'Are you sure you want to restore from this backup? This will overwrite the current database!',
         restorePasswordPrompt: 'Please enter your admin password to confirm the restore operation',
         restoreSuccess: 'Database restored successfully',

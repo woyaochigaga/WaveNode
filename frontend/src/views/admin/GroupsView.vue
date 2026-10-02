@@ -383,11 +383,21 @@
             <div class="flex items-center gap-1">
               <button
                 data-testid="group-test-connection"
+                :title="connectionTestResultTitle(row.id)"
                 @click="openConnectionTest(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                :class="[
+                  'flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors',
+                  groupConnectionTestResults.get(row.id)?.status === 'success'
+                    ? 'text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20'
+                    : groupConnectionTestResults.get(row.id)?.status === 'error'
+                      ? 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+                      : 'text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400',
+                ]"
               >
-                <Icon name="play" size="sm" />
-                <span class="text-xs">{{ t("admin.groups.testConnection") }}</span>
+                <Icon :name="connectionTestResultIcon(row.id)" size="sm" />
+                <span class="whitespace-nowrap text-xs">{{
+                  connectionTestResultLabel(row.id)
+                }}</span>
               </button>
               <button
                 @click="handleEdit(row)"
@@ -4276,6 +4286,7 @@
       :target-id="testingGroup?.id ?? null"
       :target-name="testingGroup?.name ?? ''"
       @close="closeConnectionTest"
+      @result="handleConnectionTestResult"
     />
   </AppLayout>
 </template>
@@ -4336,6 +4347,7 @@ import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
 import { extractApiErrorMessage } from "@/utils/apiError";
+import { formatDateTime } from "@/utils/format";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import {
@@ -4861,6 +4873,17 @@ const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
 const showConnectionTest = ref(false);
 const testingGroup = ref<AdminGroup | null>(null);
+interface ConnectionTestResult {
+  targetId: number;
+  status: "success" | "error";
+  model: string;
+  durationMs: number;
+  testedAt: string;
+  message?: string;
+}
+const groupConnectionTestResults = reactive(
+  new Map<number, ConnectionTestResult>(),
+);
 const sortableGroups = ref<AdminGroup[]>([]);
 type ConcreteGroupPlatform = Exclude<GroupPlatform, "composite">;
 type CompositeRouteFormState = {
@@ -6445,6 +6468,50 @@ const openConnectionTest = (group: AdminGroup) => {
 const closeConnectionTest = () => {
   showConnectionTest.value = false;
   testingGroup.value = null;
+};
+
+// 最近一次结果仅保留在当前页面会话，避免把临时健康检查误当成持久监控。
+const handleConnectionTestResult = (result: ConnectionTestResult) => {
+  groupConnectionTestResults.set(result.targetId, result);
+};
+
+const formatConnectionTestDuration = (durationMs: number) =>
+  durationMs < 1000
+    ? `${durationMs}ms`
+    : `${(durationMs / 1000).toFixed(durationMs < 10_000 ? 1 : 0)}s`;
+
+const connectionTestResultLabel = (groupId: number) => {
+  const result = groupConnectionTestResults.get(groupId);
+  if (!result) return t("admin.groups.testConnection");
+  return t(
+    result.status === "success"
+      ? "common.connectionTest.lastPassed"
+      : "common.connectionTest.lastFailed",
+    { duration: formatConnectionTestDuration(result.durationMs) },
+  );
+};
+
+const connectionTestResultIcon = (groupId: number) => {
+  const status = groupConnectionTestResults.get(groupId)?.status;
+  if (status === "success") return "checkCircle";
+  if (status === "error") return "xCircle";
+  return "play";
+};
+
+const connectionTestResultTitle = (groupId: number) => {
+  const result = groupConnectionTestResults.get(groupId);
+  if (!result) return t("admin.groups.testConnection");
+  return t(
+    result.status === "success"
+      ? "common.connectionTest.lastSuccessTitle"
+      : "common.connectionTest.lastFailureTitle",
+    {
+      model: result.model,
+      duration: formatConnectionTestDuration(result.durationMs),
+      time: formatDateTime(result.testedAt),
+      message: result.message || t("common.connectionTest.failed"),
+    },
+  );
 };
 
 const handleRPMOverrides = (group: AdminGroup) => {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -175,18 +176,13 @@ func (s *ProxyService) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-// TestConnection 测试代理连接（需要实现具体测试逻辑）
+// TestConnection 是旧版内部入口。真实代理探测统一由 AdminService.TestProxy 执行。
 func (s *ProxyService) TestConnection(ctx context.Context, id int64) error {
-	proxy, err := s.proxyRepo.GetByID(ctx, id)
+	_, err := s.proxyRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get proxy: %w", err)
 	}
-
-	// TODO: 实现代理连接测试逻辑
-	// 可以尝试通过代理发送测试请求
-	_ = proxy
-
-	return nil
+	return errors.New("legacy proxy test is unavailable; use AdminService.TestProxy")
 }
 
 // GetURL 获取代理URL

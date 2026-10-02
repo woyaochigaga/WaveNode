@@ -1542,6 +1542,43 @@ export default {
       audioReceived: 'Received test audio #{count}',
       videoPreview: 'Generated video:',
       videoReceived: 'Received test video #{count}',
+      testSummary: {
+        stage: 'Stage',
+        latency: 'Duration',
+        scheduling: 'Scheduling',
+        schedulable: 'Available for scheduling',
+        notSchedulable: 'Do not schedule yet',
+        status: {
+          success: 'Connection healthy',
+          failed: 'Connection failed',
+          cancelled: 'Test cancelled'
+        },
+        stages: {
+          complete: 'Completed',
+          lookup: 'Loading account',
+          routing: 'Selecting upstream',
+          credentials: 'Checking credentials',
+          proxy: 'Connecting to proxy',
+          dns: 'Resolving host',
+          tls: 'Establishing secure connection',
+          transport: 'Waiting for upstream',
+          rate_limit: 'Upstream rate limit',
+          upstream: 'Upstream processing',
+          cancelled: 'Cancelled by client'
+        },
+        guidance: {
+          success: 'Credentials and the upstream path were verified successfully.',
+          credentials: 'The upstream rejected these credentials. Reauthorize the account or replace its API key.',
+          permissions: 'The credentials are valid, but this account cannot access the selected model or service.',
+          rateLimit: 'The upstream is rate limiting requests. Wait for the window to reset instead of changing credentials.',
+          proxyAuth: 'The proxy rejected authentication. Check its username and password.',
+          dns: 'The server could not resolve the upstream host. Check DNS, proxy egress, and network settings.',
+          tls: 'Secure connection validation failed. Check certificates, system time, and proxy interception settings.',
+          timeout: 'The upstream did not respond in time. Check proxy quality or retry later.',
+          cancelled: 'This page cancelled the test, so the account health is unchanged.',
+          generic: 'The connection did not complete. Review the error above and check the account, proxy, and upstream service.'
+        }
+      },
       // Stats Modal
       viewStats: 'View Stats',
       usageStatistics: 'Usage Statistics',
