@@ -115,9 +115,14 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 	identity := liveCallIdentity(c, apiKey, subject.UserID, subscription)
 	created, err := h.gatewayService.CreateLiveCall(c.Request.Context(), request, identity, subject.Concurrency)
 	if err != nil {
+		reqLog.Warn("live.create_failed", zap.Error(err))
 		h.writeLiveCreateError(c, err)
 		return
 	}
+	reqLog.Info("live.created",
+		zap.String("billing_guard_status", created.BillingGuardStatus),
+		zap.Float64("estimated_max_cost", created.EstimatedMaxCost),
+	)
 	c.Header("Location", liveSidebandLocation(c.FullPath(), created.CallID))
 	c.Data(http.StatusOK, "application/sdp", created.SDP)
 }
@@ -171,6 +176,9 @@ func liveCallIdentity(
 		UserID:          userID,
 		GroupID:         apiKey.GroupID,
 		SubscriptionID:  subscriptionID,
+		BillingGroup:    apiKey.Group,
+		APIKeyQuota:     apiKey.Quota,
+		APIKeyHasRates:  apiKey.HasRateLimits(),
 		UserAgent:       c.GetHeader("User-Agent"),
 		IPAddress:       ip.GetClientIP(c),
 		InboundEndpoint: GetInboundEndpoint(c),
@@ -183,6 +191,14 @@ func (h *OpenAIGatewayHandler) writeLiveCreateError(c *gin.Context, err error) {
 		h.errorResponse(c, http.StatusTooManyRequests, "rate_limit_error", "Live concurrency limit reached")
 	case errors.Is(err, service.ErrLiveUnavailable):
 		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Live is unavailable")
+	case errors.Is(err, service.ErrLiveBillingUnavailable):
+		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Live billing guard is temporarily unavailable")
+	case errors.Is(err, service.ErrInsufficientBalance):
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.errorResponse(c, status, code, message)
 	default:
 		var attestationErr *service.LiveAttestationUnavailableError
 		if errors.As(err, &attestationErr) {

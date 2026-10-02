@@ -560,6 +560,19 @@ func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	}
 }
 
+func TestValidateLiveBillingGuardMode(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "enforce", cfg.Gateway.Live.BillingGuardMode)
+	require.NoError(t, cfg.Validate())
+
+	cfg.Gateway.Live.BillingGuardMode = "invalid"
+	err = cfg.Validate()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "gateway.live.billing_guard_mode")
+}
+
 func TestLoadOpenAIWSClientFirstMessageTimeoutFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_OPENAI_WS_CLIENT_FIRST_MESSAGE_TIMEOUT_SECONDS", "120")

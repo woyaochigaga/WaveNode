@@ -17,6 +17,7 @@ import (
 const stickySessionPrefix = "sticky_session:"
 const openAIResponsesSessionWindowPrefix = "openai_responses_session_window:"
 const liveCallPrefix = "live:call:"
+const liveCallRecoveryIndexKey = "live:call:recovery"
 
 type gatewayCache struct {
 	rdb *redis.Client
@@ -405,27 +406,41 @@ func (c *gatewayCache) SaveLiveCall(ctx context.Context, record *service.LiveCal
 		return fmt.Errorf("invalid live call record")
 	}
 	values := map[string]any{
-		"call_id":          record.CallID,
-		"account_id":       record.AccountID,
-		"api_key_id":       record.APIKeyID,
-		"user_id":          record.UserID,
-		"group_id":         record.GroupID,
-		"subscription_id":  record.SubscriptionID,
-		"lease_id":         record.LeaseID,
-		"model":            record.Model,
-		"created_at":       record.CreatedAt.UnixMilli(),
-		"expires_at":       record.ExpiresAt.UnixMilli(),
-		"controller":       record.Controller,
-		"controller_owner": record.ControllerOwner,
-		"user_agent":       record.UserAgent,
-		"ip_address":       record.IPAddress,
-		"inbound_endpoint": record.InboundEndpoint,
-		"attestation":      record.AttestationCiphertext,
+		"call_id":                         record.CallID,
+		"account_id":                      record.AccountID,
+		"api_key_id":                      record.APIKeyID,
+		"user_id":                         record.UserID,
+		"group_id":                        record.GroupID,
+		"subscription_id":                 record.SubscriptionID,
+		"lease_id":                        record.LeaseID,
+		"model":                           record.Model,
+		"created_at":                      record.CreatedAt.UnixMilli(),
+		"expires_at":                      record.ExpiresAt.UnixMilli(),
+		"controller":                      record.Controller,
+		"controller_owner":                record.ControllerOwner,
+		"user_agent":                      record.UserAgent,
+		"ip_address":                      record.IPAddress,
+		"inbound_endpoint":                record.InboundEndpoint,
+		"attestation":                     record.AttestationCiphertext,
+		"billing_guard_status":            record.BillingGuardStatus,
+		"billing_reservation_id":          record.BillingReservationID,
+		"billing_reserved_amount":         record.BillingReservedAmount,
+		"billing_rate_multiplier":         record.BillingRateMultiplier,
+		"billing_account_rate_multiplier": record.BillingAccountRateMultiplier,
+		"billing_realtime_price_per_min":  record.BillingRealtimePricePerMin,
+		"billing_realtime_price_set":      record.BillingRealtimePriceSet,
+		"billing_api_key_quota":           record.BillingAPIKeyQuota,
+		"billing_api_key_has_rates":       record.BillingAPIKeyHasRates,
+		"billing_account_type":            record.BillingAccountType,
+		"billing_account_has_quota":       record.BillingAccountHasQuota,
+		"billing_platform":                record.BillingPlatform,
 	}
 	key := liveCallKey(record.CallHash)
 	pipe := c.rdb.TxPipeline()
 	pipe.HSet(ctx, key, values)
 	pipe.Expire(ctx, key, ttl)
+	// 按 ExpiresAt 建索引，进程重启后可重新挂起到期结算，避免只依赖进程内 observer。
+	pipe.ZAdd(ctx, liveCallRecoveryIndexKey, redis.Z{Score: float64(record.ExpiresAt.UnixMilli()), Member: record.CallHash})
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -442,26 +457,46 @@ func (c *gatewayCache) GetLiveCall(ctx context.Context, callHash string) (*servi
 		value, _ := strconv.ParseInt(values[field], 10, 64)
 		return value
 	}
+	parseFloat := func(field string) float64 {
+		value, _ := strconv.ParseFloat(values[field], 64)
+		return value
+	}
+	parseBool := func(field string) bool {
+		value, _ := strconv.ParseBool(values[field])
+		return value
+	}
 	createdAt := time.UnixMilli(parseInt("created_at"))
 	expiresAt := time.UnixMilli(parseInt("expires_at"))
 	return &service.LiveCallRecord{
-		CallID:                values["call_id"],
-		CallHash:              callHash,
-		AccountID:             parseInt("account_id"),
-		APIKeyID:              parseInt("api_key_id"),
-		UserID:                parseInt("user_id"),
-		GroupID:               parseInt("group_id"),
-		SubscriptionID:        parseInt("subscription_id"),
-		LeaseID:               values["lease_id"],
-		Model:                 values["model"],
-		CreatedAt:             createdAt,
-		ExpiresAt:             expiresAt,
-		Controller:            values["controller"],
-		ControllerOwner:       values["controller_owner"],
-		UserAgent:             values["user_agent"],
-		IPAddress:             values["ip_address"],
-		InboundEndpoint:       values["inbound_endpoint"],
-		AttestationCiphertext: values["attestation"],
+		CallID:                       values["call_id"],
+		CallHash:                     callHash,
+		AccountID:                    parseInt("account_id"),
+		APIKeyID:                     parseInt("api_key_id"),
+		UserID:                       parseInt("user_id"),
+		GroupID:                      parseInt("group_id"),
+		SubscriptionID:               parseInt("subscription_id"),
+		LeaseID:                      values["lease_id"],
+		Model:                        values["model"],
+		CreatedAt:                    createdAt,
+		ExpiresAt:                    expiresAt,
+		Controller:                   values["controller"],
+		ControllerOwner:              values["controller_owner"],
+		UserAgent:                    values["user_agent"],
+		IPAddress:                    values["ip_address"],
+		InboundEndpoint:              values["inbound_endpoint"],
+		AttestationCiphertext:        values["attestation"],
+		BillingGuardStatus:           values["billing_guard_status"],
+		BillingReservationID:         values["billing_reservation_id"],
+		BillingReservedAmount:        parseFloat("billing_reserved_amount"),
+		BillingRateMultiplier:        parseFloat("billing_rate_multiplier"),
+		BillingAccountRateMultiplier: parseFloat("billing_account_rate_multiplier"),
+		BillingRealtimePricePerMin:   parseFloat("billing_realtime_price_per_min"),
+		BillingRealtimePriceSet:      parseBool("billing_realtime_price_set"),
+		BillingAPIKeyQuota:           parseFloat("billing_api_key_quota"),
+		BillingAPIKeyHasRates:        parseBool("billing_api_key_has_rates"),
+		BillingAccountType:           values["billing_account_type"],
+		BillingAccountHasQuota:       parseBool("billing_account_has_quota"),
+		BillingPlatform:              values["billing_platform"],
 	}, nil
 }
 
@@ -485,5 +520,38 @@ func (c *gatewayCache) ReleaseLiveController(ctx context.Context, callHash, owne
 
 func (c *gatewayCache) MarkLiveCallClosed(ctx context.Context, callHash string, ttl time.Duration) (bool, error) {
 	result, err := markLiveCallClosedScript.Run(ctx, c.rdb, []string{liveCallKey(callHash)}, int64(ttl.Seconds())).Int()
+	if err == nil && result == 1 {
+		if removeErr := c.rdb.ZRem(ctx, liveCallRecoveryIndexKey, callHash).Err(); removeErr != nil {
+			return true, removeErr
+		}
+	}
 	return result == 1, err
+}
+
+func (c *gatewayCache) ListLiveCallsForRecovery(ctx context.Context, before time.Time, limit int) ([]*service.LiveCallRecord, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	hashes, err := c.rdb.ZRangeByScore(ctx, liveCallRecoveryIndexKey, &redis.ZRangeBy{
+		Min:    "-inf",
+		Max:    strconv.FormatInt(before.UnixMilli(), 10),
+		Offset: 0,
+		Count:  int64(limit),
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*service.LiveCallRecord, 0, len(hashes))
+	for _, callHash := range hashes {
+		record, getErr := c.GetLiveCall(ctx, callHash)
+		if errors.Is(getErr, service.ErrLiveCallNotFound) {
+			_ = c.rdb.ZRem(ctx, liveCallRecoveryIndexKey, callHash).Err()
+			continue
+		}
+		if getErr != nil {
+			return nil, getErr
+		}
+		result = append(result, record)
+	}
+	return result, nil
 }

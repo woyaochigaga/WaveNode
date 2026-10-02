@@ -173,17 +173,49 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		return
 	}
 
-	// 余额模式在途预留（与计费同口径估算；计费任务扣减余额缓存后才释放）。
-	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body))
-	if inflightErr != nil {
-		status, code, message, retryAfter := billingErrorDetails(inflightErr)
-		if retryAfter > 0 {
-			c.Header("Retry-After", strconv.Itoa(retryAfter))
+	// 异步视频的预留必须跨越“创建请求 → 任务完成”，普通图片仍由 handler 生命周期托管。
+	var asyncReservation *asyncMediaBalanceReservation
+	asyncReservationTransferred := false
+	if isGrokVideoCreateEndpoint(endpoint) {
+		asyncReservation, err = reserveAsyncMediaBalance(
+			c.Request.Context(), h.billingCacheService, h.gatewayService, apiKey, subscription,
+			grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body),
+		)
+		if err != nil {
+			status, code, message, retryAfter := billingErrorDetails(err)
+			if retryAfter > 0 {
+				c.Header("Retry-After", strconv.Itoa(retryAfter))
+			}
+			h.errorResponse(c, status, code, message)
+			return
 		}
-		h.errorResponse(c, status, code, message)
-		return
+		if asyncReservation != nil {
+			defer func() {
+				if asyncReservationTransferred {
+					return
+				}
+				releaseCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				if releaseErr := h.billingCacheService.ReleaseInflightBalanceStrict(releaseCtx, subject.UserID, asyncReservation.ID); releaseErr != nil {
+					reqLog.Warn("grok_media.async_reservation_release_failed", zap.Error(releaseErr))
+				}
+			}()
+		}
+	} else {
+		inflightDone, inflightErr := reserveInflightBalance(
+			c, h.billingCacheService, h.gatewayService, apiKey, subscription,
+			grokMediaInflightEstimate(endpoint, routingModel, requestInfo, body),
+		)
+		if inflightErr != nil {
+			status, code, message, retryAfter := billingErrorDetails(inflightErr)
+			if retryAfter > 0 {
+				c.Header("Retry-After", strconv.Itoa(retryAfter))
+			}
+			h.errorResponse(c, status, code, message)
+			return
+		}
+		defer inflightDone()
 	}
-	defer inflightDone()
 
 	sessionSeed := body
 	if len(sessionSeed) == 0 && strings.TrimSpace(requestID) != "" {
@@ -499,6 +531,11 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				// Wall-clock start for usage duration_ms: create accepted → first done discovery.
 				CreatedAt: videoCreateStartedAt,
 			}
+			if asyncReservation != nil {
+				pending.BillingReservationID = asyncReservation.ID
+				pending.BillingReservedAmount = asyncReservation.Amount
+			}
+			pendingStored := false
 			if err := h.gatewayService.StoreGrokVideoPendingBilling(requestCtx, result.ResponseID, subject.UserID, apiKey.ID, pending); err != nil {
 				reqLog.Warn("grok_media.store_video_pending_billing_failed_retrying",
 					zap.Int64("account_id", account.ID),
@@ -513,7 +550,22 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 						zap.String("request_id", result.ResponseID),
 						zap.Error(err2),
 					)
+				} else {
+					pendingStored = true
 				}
+			} else {
+				pendingStored = true
+			}
+			if pendingStored && asyncReservation != nil {
+				// 任务快照已经接管预留；后续由完成计费或终态失败路径释放。
+				asyncReservationTransferred = true
+			}
+		}
+		if endpoint == service.SeedanceEndpointDelete || isAsyncMediaTerminalWithoutBilling(result.MediaStatus) {
+			if releaseErr := h.gatewayService.ReleaseGrokVideoBillingReservation(
+				requestCtx, requestID, subject.UserID, apiKey.ID,
+			); releaseErr != nil {
+				reqLog.Warn("grok_media.terminal_reservation_release_failed", zap.String("request_id", requestID), zap.Error(releaseErr))
 			}
 		}
 		// Status poll OR content download can observe official done+video.url.
@@ -791,6 +843,24 @@ func recordGrokMediaUsage(
 				zap.Int64("account_id", account.ID),
 			).Error("grok_media.record_usage_failed", zap.Error(err))
 			reqLog.Debug("grok_media.record_usage_failed", zap.Error(err))
+			return
+		}
+		if videoTaskID != "" {
+			if releaseErr := h.gatewayService.ReleaseGrokVideoBillingReservation(ctx, videoTaskID, subject.UserID, apiKey.ID); releaseErr != nil {
+				reqLog.Warn("grok_media.video_reservation_release_failed",
+					zap.String("request_id", videoTaskID),
+					zap.Error(releaseErr),
+				)
+			}
 		}
 	})
+}
+
+func isAsyncMediaTerminalWithoutBilling(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "failed", "cancelled", "canceled", "expired":
+		return true
+	default:
+		return false
+	}
 }

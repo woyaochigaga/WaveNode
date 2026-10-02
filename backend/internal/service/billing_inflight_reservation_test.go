@@ -293,6 +293,20 @@ func TestInflightReservation_HeldUntilBillingTaskDone(t *testing.T) {
 	nilRes.Release()
 }
 
+func TestReserveInflightBalanceStrictRequiresPersistentCapacity(t *testing.T) {
+	cache := newMemInflightCache(0.05)
+	svc := newInflightSvc(t, cache, 60)
+
+	err := svc.ReserveInflightBalanceStrict(context.Background(), 1, "live:first", 0.1, time.Minute)
+	require.ErrorIs(t, err, ErrInsufficientBalance)
+	require.Zero(t, cache.count())
+
+	unavailable := NewBillingCacheService(nil, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	t.Cleanup(unavailable.Stop)
+	err = unavailable.ReserveInflightBalanceStrict(context.Background(), 1, "live:no-cache", 0.1, time.Minute)
+	require.ErrorIs(t, err, ErrInflightReservationUnavailable)
+}
+
 func TestInflightReservation_RenewedWhileHandlerActive(t *testing.T) {
 	cache := newMemInflightCache(1)
 	svc := newInflightSvc(t, cache, 1)

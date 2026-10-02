@@ -81,6 +81,57 @@ func TestReserveInflightBalance_UnpricedFailOpenByDefaultFailClosedOptIn(t *test
 	require.ErrorIs(t, err, service.ErrInsufficientBalance)
 }
 
+func TestReserveAsyncMediaBalancePersistsUntilExplicitRelease(t *testing.T) {
+	cache := newHandlerInflightCache(1)
+	cfg := &config.Config{}
+	cfg.Billing.InflightReservation = config.InflightReservationConfig{Enabled: true, TTLSeconds: 60}
+	billing := service.NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billing.Stop)
+	apiKey := &service.APIKey{User: &service.User{ID: 7}}
+
+	reservation, err := reserveAsyncMediaBalance(
+		context.Background(), billing, &countingEstimator{cost: 0.6, priced: true}, apiKey, nil,
+		service.InflightEstimateRequest{Model: "grok-imagine-video", Kind: service.InflightEstimateVideo},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, reservation)
+	require.NotEmpty(t, reservation.ID)
+	require.InDelta(t, 0.6, reservation.Amount, 1e-12)
+	require.Equal(t, 1, cache.count(), "handler 返回前不能自动释放异步任务预留")
+
+	err = billing.ReleaseInflightBalanceStrict(context.Background(), apiKey.User.ID, reservation.ID)
+	require.NoError(t, err)
+	require.Zero(t, cache.count())
+}
+
+func TestReserveAsyncMediaBalanceRejectsFirstInsufficientAndUnavailableCache(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Billing.InflightReservation.Enabled = true
+	apiKey := &service.APIKey{User: &service.User{ID: 8}}
+	estimator := &countingEstimator{cost: 0.6, priced: true}
+
+	cache := newHandlerInflightCache(0.1)
+	billing := service.NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billing.Stop)
+	_, err := reserveAsyncMediaBalance(context.Background(), billing, estimator, apiKey, nil, service.InflightEstimateRequest{Model: "video"})
+	require.ErrorIs(t, err, service.ErrInsufficientBalance)
+	require.Zero(t, cache.count())
+
+	unavailable := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(unavailable.Stop)
+	_, err = reserveAsyncMediaBalance(context.Background(), unavailable, estimator, apiKey, nil, service.InflightEstimateRequest{Model: "video"})
+	require.ErrorIs(t, err, service.ErrInflightReservationUnavailable)
+}
+
+func TestAsyncMediaTerminalStatus(t *testing.T) {
+	for _, status := range []string{"failed", "cancelled", "canceled", "expired", " FAILED "} {
+		require.True(t, isAsyncMediaTerminalWithoutBilling(status), status)
+	}
+	for _, status := range []string{"", "queued", "running", "done", "succeeded"} {
+		require.False(t, isAsyncMediaTerminalWithoutBilling(status), status)
+	}
+}
+
 // handlerInflightCache 内存版余额缓存 + 在途预留（语义同 Redis Lua）。
 type handlerInflightCache struct {
 	service.BillingCache

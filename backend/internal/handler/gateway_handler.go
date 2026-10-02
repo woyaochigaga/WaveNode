@@ -2441,6 +2441,9 @@ func extractQuotaResetSeconds(err error) int {
 }
 
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
+	if errors.Is(err, service.ErrInflightReservationUnavailable) {
+		return http.StatusServiceUnavailable, "billing_service_error", "Billing reservation service temporarily unavailable. Please retry later.", 0
+	}
 	if errors.Is(err, service.ErrBillingServiceUnavailable) {
 		msg := pkgerrors.Message(err)
 		if msg == "" {

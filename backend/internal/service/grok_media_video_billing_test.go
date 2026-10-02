@@ -1,11 +1,23 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
+
+type grokPendingReservationStore struct {
+	GatewayCache
+	payload []byte
+}
+
+func (s *grokPendingReservationStore) GetGrokVideoPendingBilling(context.Context, string) ([]byte, error) {
+	return append([]byte(nil), s.payload...), nil
+}
 
 func TestGrokVideoE2EDurationFromCreatedAt(t *testing.T) {
 	t.Parallel()
@@ -28,6 +40,32 @@ func TestGrokVideoPendingCreatedAtStampOnStoreShape(t *testing.T) {
 	d := GrokVideoE2EDuration(stamp, time.Now().UTC().Add(2*time.Second))
 	require.GreaterOrEqual(t, d, time.Second)
 	require.LessOrEqual(t, d, 3*time.Second)
+}
+
+func TestReleaseGrokVideoBillingReservationUsesPersistedSnapshot(t *testing.T) {
+	cache := newLiveBillingTestCache(1)
+	cfg := &config.Config{}
+	billingCache := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billingCache.Stop)
+	require.NoError(t, billingCache.ReserveInflightBalanceStrict(
+		context.Background(), 10, "async-media:test", 0.25, time.Hour,
+	))
+	payload, err := json.Marshal(GrokVideoPendingBilling{
+		Model:                 "grok-imagine-video",
+		BillingReservationID:  "async-media:test",
+		BillingReservedAmount: 0.25,
+		VideoDurationSeconds:  8,
+	})
+	require.NoError(t, err)
+	service := &OpenAIGatewayService{
+		cache:               &grokPendingReservationStore{payload: payload},
+		billingCacheService: billingCache,
+	}
+
+	require.NoError(t, service.ReleaseGrokVideoBillingReservation(context.Background(), "task", 10, 20))
+	require.Zero(t, cache.count())
+	// 重复终态回调仍是幂等释放。
+	require.NoError(t, service.ReleaseGrokVideoBillingReservation(context.Background(), "task", 10, 20))
 }
 
 func TestIsGrokVideoStatusBillable(t *testing.T) {

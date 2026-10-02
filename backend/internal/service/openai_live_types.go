@@ -8,18 +8,26 @@ import (
 )
 
 const (
-	LiveControllerPending  = "pending"
-	LiveControllerObserver = "observer"
-	LiveControllerProxy    = "proxy"
-	LiveControllerClosed   = "closed"
+	LiveControllerPending     = "pending"
+	LiveControllerObserver    = "observer"
+	LiveControllerProxy       = "proxy"
+	LiveControllerClosed      = "closed"
+	LiveBillingGuardDisabled  = "disabled"
+	LiveBillingGuardObserve   = "observe"
+	LiveBillingGuardEnforce   = "enforce"
+	LiveBillingStatusReserved = "reserved"
+	LiveBillingStatusObserve  = "observe"
+	LiveBillingStatusFree     = "free"
+	LiveBillingStatusEnforced = "enforced"
 )
 
 var (
-	ErrLiveUnavailable       = errors.New("live is unavailable")
-	ErrLiveConcurrencyFull   = errors.New("live concurrency is full")
-	ErrLiveCallNotFound      = errors.New("live call not found")
-	ErrLiveIdentityMismatch  = errors.New("live call identity mismatch")
-	ErrLiveControllerChanged = errors.New("live controller changed")
+	ErrLiveUnavailable        = errors.New("live is unavailable")
+	ErrLiveConcurrencyFull    = errors.New("live concurrency is full")
+	ErrLiveCallNotFound       = errors.New("live call not found")
+	ErrLiveIdentityMismatch   = errors.New("live call identity mismatch")
+	ErrLiveControllerChanged  = errors.New("live controller changed")
+	ErrLiveBillingUnavailable = errors.New("live billing guard unavailable")
 )
 
 type LiveAttestationUnavailableError struct {
@@ -40,10 +48,14 @@ type LiveCallRequest struct {
 }
 
 type LiveCallIdentity struct {
-	APIKeyID        int64
-	UserID          int64
-	GroupID         *int64
-	SubscriptionID  *int64
+	APIKeyID       int64
+	UserID         int64
+	GroupID        *int64
+	SubscriptionID *int64
+	// BillingGroup 只在创建阶段用于生成计费快照，不会写入 Redis。
+	BillingGroup    *Group
+	APIKeyQuota     float64
+	APIKeyHasRates  bool
 	UserAgent       string
 	IPAddress       string
 	InboundEndpoint string
@@ -68,13 +80,29 @@ type LiveCallRecord struct {
 	InboundEndpoint string
 	// AttestationCiphertext 仅用于让同一会话的 Sideband 复用创建时的证明。
 	AttestationCiphertext string
+
+	// BillingGuardStatus 是创建时的计费护栏快照：disabled/observe/reserved/free。
+	BillingGuardStatus           string
+	BillingReservationID         string
+	BillingReservedAmount        float64
+	BillingRateMultiplier        float64
+	BillingAccountRateMultiplier float64
+	BillingRealtimePricePerMin   float64
+	BillingRealtimePriceSet      bool
+	BillingAPIKeyQuota           float64
+	BillingAPIKeyHasRates        bool
+	BillingAccountType           string
+	BillingAccountHasQuota       bool
+	BillingPlatform              string
 }
 
 type LiveCallCreated struct {
-	SDP      []byte
-	CallID   string
-	Location string
-	Account  *Account
+	SDP                []byte
+	CallID             string
+	Location           string
+	Account            *Account
+	BillingGuardStatus string
+	EstimatedMaxCost   float64
 }
 
 // LiveCallStore 由 GatewayCache 的 Redis 实现可选提供，避免扩大旧缓存接口。
@@ -85,6 +113,11 @@ type LiveCallStore interface {
 	ReleaseLiveController(ctx context.Context, callHash, owner string) (bool, error)
 	GetLiveController(ctx context.Context, callHash string) (string, error)
 	MarkLiveCallClosed(ctx context.Context, callHash string, ttl time.Duration) (bool, error)
+}
+
+// LiveCallRecoveryStore 提供进程重启后的只读恢复索引；旧缓存实现不支持时不影响普通 Live 流程。
+type LiveCallRecoveryStore interface {
+	ListLiveCallsForRecovery(ctx context.Context, before time.Time, limit int) ([]*LiveCallRecord, error)
 }
 
 type LiveConcurrencyCache interface {

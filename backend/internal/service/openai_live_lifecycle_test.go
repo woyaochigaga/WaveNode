@@ -115,6 +115,8 @@ type liveTestStore struct {
 	claimErr         error
 	getCallErr       error
 	getControllerErr error
+	recoveryFailures int
+	recoveryCalls    int
 }
 
 func (s *liveTestStore) SaveLiveCall(_ context.Context, record *LiveCallRecord, _ time.Duration) error {
@@ -192,6 +194,21 @@ func (s *liveTestStore) MarkLiveCallClosed(_ context.Context, callHash string, _
 	return true, nil
 }
 
+func (s *liveTestStore) ListLiveCallsForRecovery(_ context.Context, before time.Time, _ int) ([]*LiveCallRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recoveryCalls++
+	if s.recoveryFailures > 0 {
+		s.recoveryFailures--
+		return nil, errors.New("temporary redis outage")
+	}
+	if s.record == nil || s.record.ExpiresAt.After(before) {
+		return nil, nil
+	}
+	copy := *s.record
+	return []*LiveCallRecord{&copy}, nil
+}
+
 type liveTestConcurrencyCache struct {
 	ConcurrencyCache
 	mu       sync.Mutex
@@ -246,6 +263,285 @@ func (r *liveTestUsageRepo) Create(_ context.Context, log *UsageLog) (bool, erro
 	copy := *log
 	r.logs = append(r.logs, &copy)
 	return true, nil
+}
+
+type liveTestBillingRepo struct {
+	UsageBillingRepository
+	mu        sync.Mutex
+	commands  []*UsageBillingCommand
+	applied   map[string]struct{}
+	failCount int
+	nilResult bool
+}
+
+type liveBillingTestCache struct {
+	BillingCache
+	mu            sync.Mutex
+	balance       float64
+	holds         map[string]float64
+	invalidations int
+}
+
+func newLiveBillingTestCache(balance float64) *liveBillingTestCache {
+	return &liveBillingTestCache{balance: balance, holds: make(map[string]float64)}
+}
+
+func (c *liveBillingTestCache) GetUserBalance(context.Context, int64) (float64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.balance, nil
+}
+
+func (c *liveBillingTestCache) InvalidateUserBalance(context.Context, int64) error {
+	c.mu.Lock()
+	c.invalidations++
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *liveBillingTestCache) ReserveInflightBalance(
+	_ context.Context,
+	_ int64,
+	requestID string,
+	amount float64,
+	balance float64,
+	_ time.Duration,
+) (bool, float64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	reserved := 0.0
+	for _, value := range c.holds {
+		reserved += value
+	}
+	if balance-reserved < amount {
+		return false, reserved, nil
+	}
+	c.holds[requestID] = amount
+	return true, reserved, nil
+}
+
+func (c *liveBillingTestCache) ReleaseInflightBalance(_ context.Context, _ int64, requestID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.holds, requestID)
+	return nil
+}
+
+func (c *liveBillingTestCache) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.holds)
+}
+
+func (c *liveBillingTestCache) invalidationCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.invalidations
+}
+
+func (r *liveTestBillingRepo) Apply(_ context.Context, command *UsageBillingCommand) (*UsageBillingApplyResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.failCount > 0 {
+		r.failCount--
+		return nil, errors.New("temporary billing outage")
+	}
+	if r.nilResult {
+		return nil, nil
+	}
+	copy := *command
+	r.commands = append(r.commands, &copy)
+	if r.applied == nil {
+		r.applied = make(map[string]struct{})
+	}
+	if _, exists := r.applied[command.RequestID]; exists {
+		return &UsageBillingApplyResult{Applied: false}, nil
+	}
+	r.applied[command.RequestID] = struct{}{}
+	return &UsageBillingApplyResult{Applied: true}, nil
+}
+
+func (r *liveTestBillingRepo) appliedCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.applied)
+}
+
+func newLiveBillingTestService(
+	t *testing.T,
+	balance float64,
+	mode string,
+) (*OpenAIGatewayService, *liveBillingTestCache, *liveTestBillingRepo) {
+	t.Helper()
+	cfg := &config.Config{}
+	cfg.Gateway.Live.MaxSessionDurationSeconds = 60
+	cfg.Gateway.Live.BillingGuardMode = mode
+	cache := newLiveBillingTestCache(balance)
+	billingCache := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billingCache.Stop)
+	billingRepo := &liveTestBillingRepo{}
+	return &OpenAIGatewayService{
+		cfg:                 cfg,
+		billingService:      NewBillingService(cfg, nil),
+		billingCacheService: billingCache,
+		usageBillingRepo:    billingRepo,
+	}, cache, billingRepo
+}
+
+func TestPrepareLiveBillingPlanReservesMaximumSessionCost(t *testing.T) {
+	service, cache, _ := newLiveBillingTestService(t, 1, LiveBillingGuardEnforce)
+	price := 0.1
+	plan, err := service.prepareLiveBillingPlan(context.Background(), LiveCallIdentity{
+		UserID:       33,
+		BillingGroup: &Group{ID: 44, Platform: PlatformOpenAI, RateMultiplier: 1, AudioRealtimePricePerMin: &price},
+	})
+	require.NoError(t, err)
+	require.Equal(t, LiveBillingStatusReserved, plan.status)
+	require.NotEmpty(t, plan.reservationID)
+	require.InDelta(t, price, plan.reservedAmount, 1e-9)
+	require.Equal(t, 1, cache.count())
+
+	service.releaseLiveBillingReservation(33, plan)
+	require.Equal(t, 0, cache.count())
+}
+
+func TestPrepareLiveBillingPlanRejectsInsufficientBalanceBeforeFirstCall(t *testing.T) {
+	service, cache, _ := newLiveBillingTestService(t, 0.01, LiveBillingGuardEnforce)
+	price := 0.1
+	_, err := service.prepareLiveBillingPlan(context.Background(), LiveCallIdentity{
+		UserID:       33,
+		BillingGroup: &Group{ID: 44, Platform: PlatformOpenAI, RateMultiplier: 1, AudioRealtimePricePerMin: &price},
+	})
+	require.ErrorIs(t, err, ErrInsufficientBalance)
+	require.Zero(t, cache.count(), "余额不足不能留下幽灵预留")
+}
+
+func TestFinalizeLiveCallObserveModeDoesNotCharge(t *testing.T) {
+	price := 0.1
+	record := &LiveCallRecord{
+		CallID:                     "call_observe",
+		CallHash:                   hashLiveCallID("call_observe"),
+		AccountID:                  11,
+		APIKeyID:                   22,
+		UserID:                     33,
+		GroupID:                    44,
+		LeaseID:                    "lease-observe",
+		Model:                      "gpt-live-test",
+		CreatedAt:                  time.Now().Add(-time.Minute),
+		ExpiresAt:                  time.Now().Add(time.Hour),
+		Controller:                 LiveControllerPending,
+		BillingGuardStatus:         LiveBillingStatusObserve,
+		BillingRateMultiplier:      1,
+		BillingRealtimePricePerMin: price,
+		BillingRealtimePriceSet:    true,
+	}
+	store := &liveTestStore{}
+	require.NoError(t, store.SaveLiveCall(context.Background(), record, time.Hour))
+	usageRepo := &liveTestUsageRepo{}
+	billingRepo := &liveTestBillingRepo{}
+	cfg := &config.Config{}
+	cfg.Gateway.Live.BillingGuardMode = LiveBillingGuardObserve
+	service := &OpenAIGatewayService{
+		cache:              store,
+		cfg:                cfg,
+		billingService:     NewBillingService(cfg, nil),
+		usageBillingRepo:   billingRepo,
+		usageLogRepo:       usageRepo,
+		concurrencyService: NewConcurrencyService(&liveTestConcurrencyCache{}),
+	}
+
+	require.True(t, service.finalizeLiveCall(record))
+	require.Zero(t, billingRepo.appliedCount())
+	usageRepo.mu.Lock()
+	require.Len(t, usageRepo.logs, 1)
+	require.Greater(t, usageRepo.logs[0].TotalCost, 0.0, "观测模式仍要记录理论成本")
+	require.Zero(t, usageRepo.logs[0].ActualCost, "观测模式不能形成真实收入或扣款")
+	usageRepo.mu.Unlock()
+}
+
+func TestRecoverLiveCallsRetriesTemporaryStoreFailure(t *testing.T) {
+	store := &liveTestStore{recoveryFailures: 1}
+	cfg := &config.Config{}
+	cfg.Gateway.Live.BillingGuardMode = LiveBillingGuardEnforce
+	service := &OpenAIGatewayService{cache: store, cfg: cfg}
+
+	err := service.recoverLiveCallsWithRetry(context.Background(), 2, time.Millisecond)
+	require.NoError(t, err)
+	require.Equal(t, 2, store.recoveryCalls)
+}
+
+func TestFinalizeLiveCallRetriesEmptyBillingResult(t *testing.T) {
+	service, _, billingRepo := newLiveBillingTestService(t, 1, LiveBillingGuardEnforce)
+	billingRepo.nilResult = true
+	store := &liveTestStore{}
+	service.cache = store
+	service.concurrencyService = NewConcurrencyService(&liveTestConcurrencyCache{})
+	record := &LiveCallRecord{
+		CallID:                     "call_empty_billing_result",
+		CallHash:                   hashLiveCallID("call_empty_billing_result"),
+		AccountID:                  11,
+		APIKeyID:                   22,
+		UserID:                     33,
+		GroupID:                    44,
+		LeaseID:                    "lease-empty-result",
+		Model:                      "gpt-live-test",
+		CreatedAt:                  time.Now().Add(-time.Minute),
+		ExpiresAt:                  time.Now().Add(time.Minute),
+		Controller:                 LiveControllerPending,
+		BillingGuardStatus:         LiveBillingStatusReserved,
+		BillingReservedAmount:      0.1,
+		BillingRateMultiplier:      1,
+		BillingRealtimePricePerMin: 0.1,
+		BillingRealtimePriceSet:    true,
+	}
+	require.NoError(t, store.SaveLiveCall(context.Background(), record, time.Hour))
+
+	require.False(t, service.finalizeLiveCall(record))
+	loaded, err := store.GetLiveCall(context.Background(), record.CallHash)
+	require.NoError(t, err)
+	require.NotEqual(t, LiveControllerClosed, loaded.Controller)
+}
+
+func TestFinalizeLiveCallRetriesAndDeduplicatesBilling(t *testing.T) {
+	service, cache, billingRepo := newLiveBillingTestService(t, 1, LiveBillingGuardEnforce)
+	billingRepo.failCount = 1
+	service.cache = &liveTestStore{}
+	service.concurrencyService = NewConcurrencyService(&liveTestConcurrencyCache{})
+	service.usageLogRepo = &liveTestUsageRepo{}
+	require.NoError(t, service.billingCacheService.ReserveInflightBalanceStrict(
+		context.Background(), 33, "live:test-retry", 0.1, time.Minute,
+	))
+	record := &LiveCallRecord{
+		CallID:                     "call_retry",
+		CallHash:                   hashLiveCallID("call_retry"),
+		AccountID:                  11,
+		APIKeyID:                   22,
+		UserID:                     33,
+		GroupID:                    44,
+		LeaseID:                    "lease-retry",
+		Model:                      "gpt-live-test",
+		CreatedAt:                  time.Now().Add(-time.Minute),
+		ExpiresAt:                  time.Now().Add(time.Minute),
+		Controller:                 LiveControllerPending,
+		BillingGuardStatus:         LiveBillingStatusReserved,
+		BillingReservationID:       "live:test-retry",
+		BillingReservedAmount:      0.1,
+		BillingRateMultiplier:      1,
+		BillingRealtimePricePerMin: 0.1,
+		BillingRealtimePriceSet:    true,
+		BillingAccountType:         AccountTypeOAuth,
+	}
+	require.NoError(t, service.cache.(LiveCallStore).SaveLiveCall(context.Background(), record, time.Hour))
+
+	restoreInterval := liveBillingRetryInterval
+	liveBillingRetryInterval = time.Millisecond
+	t.Cleanup(func() { liveBillingRetryInterval = restoreInterval })
+	service.finalizeLiveCallWithRetry(record)
+	// 再次触发 finalize，统一账单的 request_id 仍只能应用一次。
+	require.True(t, service.finalizeLiveCall(record))
+	require.Equal(t, 1, billingRepo.appliedCount())
+	require.Equal(t, 1, cache.invalidationCount(), "重复 finalize 不能重复同步账务缓存")
+	require.Zero(t, cache.count(), "结算成功后必须释放最长时长预留")
 }
 
 func TestRunLiveControllerClosesExpiredSession(t *testing.T) {

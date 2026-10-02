@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"math"
 	"strings"
 	"sync"
@@ -13,6 +14,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/google/uuid"
 )
+
+// ErrInflightReservationUnavailable 表示需要持久化预留时，Redis 预留能力不可用。
+// 普通文本请求仍可沿用原有 fail-open 逻辑；Live 成本护栏会把它视为硬失败。
+var ErrInflightReservationUnavailable = errors.New("inflight balance reservation unavailable")
 
 // InflightBalanceReservationCache 余额在途预留的缓存能力（可选）。
 // BillingCache 的 Redis 实现同时实现此接口；未实现时在途预留自动关闭（fail-open）。
@@ -233,6 +238,66 @@ func (s *BillingCacheService) ReserveInflightBalance(ctx context.Context, user *
 // 仅当 Redis 明确判定 缓存余额 - 在途合计 < estimate（且已有在途请求）时返回 ErrInsufficientBalance。
 func (s *BillingCacheService) ReserveInflight(ctx context.Context, user *User, group *Group, subscription *UserSubscription, estimate float64) (*InflightReservation, error) {
 	return s.reserveInflight(ctx, user, group, subscription, estimate, true)
+}
+
+// ReserveInflightBalanceStrict 使用调用方提供的稳定 requestID 登记持久化预留。
+// Live 和异步媒体的 handler 会先返回，不能使用普通 InflightReservation 的内存句柄，
+// 因此预留 ID 必须写入持久化任务记录，供其他进程续期、释放和恢复结算。
+func (s *BillingCacheService) ReserveInflightBalanceStrict(
+	ctx context.Context,
+	userID int64,
+	requestID string,
+	amount float64,
+	ttl time.Duration,
+) error {
+	if s == nil || s.cache == nil || userID <= 0 || strings.TrimSpace(requestID) == "" || amount <= 0 {
+		return ErrInflightReservationUnavailable
+	}
+	rc, ok := s.cache.(InflightBalanceReservationCache)
+	if !ok || rc == nil {
+		return ErrInflightReservationUnavailable
+	}
+	balance, err := s.GetUserBalance(ctx, userID)
+	if err != nil {
+		return ErrInflightReservationUnavailable
+	}
+	// Live 的预留表示“最长会话可能产生的成本”，首个请求也必须有足额余额。
+	// 普通文本在途保护仍保持原来的 fail-open/并发透支防护语义，不受这里影响。
+	if balance < amount {
+		return ErrInsufficientBalance
+	}
+	allowed, _, err := rc.ReserveInflightBalance(ctx, userID, requestID, amount, balance, ttl)
+	if err != nil {
+		return ErrInflightReservationUnavailable
+	}
+	if !allowed {
+		return ErrInsufficientBalance
+	}
+	return nil
+}
+
+// ReleaseInflightBalanceStrict 释放 Live 或异步媒体的持久化预留，操作本身保持幂等。
+func (s *BillingCacheService) ReleaseInflightBalanceStrict(ctx context.Context, userID int64, requestID string) error {
+	if s == nil || s.cache == nil || userID <= 0 || strings.TrimSpace(requestID) == "" {
+		return ErrInflightReservationUnavailable
+	}
+	rc, ok := s.cache.(InflightBalanceReservationCache)
+	if !ok || rc == nil {
+		return ErrInflightReservationUnavailable
+	}
+	return rc.ReleaseInflightBalance(ctx, userID, requestID)
+}
+
+// RenewInflightBalanceStrict 续期持久化预留，避免长会话超过 Redis TTL 后失去成本护栏。
+func (s *BillingCacheService) RenewInflightBalanceStrict(ctx context.Context, userID int64, requestID string, ttl time.Duration) (bool, error) {
+	if s == nil || s.cache == nil || userID <= 0 || strings.TrimSpace(requestID) == "" {
+		return false, ErrInflightReservationUnavailable
+	}
+	renewer, ok := s.cache.(InflightBalanceReservationRenewer)
+	if !ok || renewer == nil {
+		return false, ErrInflightReservationUnavailable
+	}
+	return renewer.RenewInflightBalance(ctx, userID, requestID, ttl)
 }
 
 func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, group *Group, subscription *UserSubscription, estimate float64, renew bool) (*InflightReservation, error) {

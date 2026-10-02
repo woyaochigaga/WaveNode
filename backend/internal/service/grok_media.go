@@ -381,6 +381,9 @@ type GrokVideoPendingBilling struct {
 	VideoResolution      string `json:"video_resolution,omitempty"`
 	VideoDurationSeconds int    `json:"video_duration_seconds,omitempty"`
 	OriginalModel        string `json:"original_model,omitempty"`
+	// BillingReservationID 把创建前的最大成本预留交给异步任务生命周期管理。
+	BillingReservationID  string  `json:"billing_reservation_id,omitempty"`
+	BillingReservedAmount float64 `json:"billing_reserved_amount,omitempty"`
 	// CreatedAt is when the gateway accepted the async create (RFC3339Nano UTC).
 	// duration_ms for deferred billing is measured from this instant until the
 	// first official done+video.url observation (status poll or content download),
@@ -532,6 +535,23 @@ func (s *OpenAIGatewayService) ReleaseGrokVideoBilling(
 		return fmt.Errorf("grok video billing claim key is invalid")
 	}
 	return s.cache.ReleaseGrokVideoBilled(ctx, key)
+}
+
+// ReleaseGrokVideoBillingReservation 在任务成功计费或无费用终态后释放持久化预留。
+// Redis 删除本身幂等，重复状态轮询和重复 worker 回调可以安全调用。
+func (s *OpenAIGatewayService) ReleaseGrokVideoBillingReservation(
+	ctx context.Context,
+	requestID string,
+	userID, apiKeyID int64,
+) error {
+	if s == nil || s.billingCacheService == nil {
+		return nil
+	}
+	pending, err := s.LoadGrokVideoPendingBilling(ctx, requestID, userID, apiKeyID)
+	if err != nil || pending == nil || strings.TrimSpace(pending.BillingReservationID) == "" {
+		return err
+	}
+	return s.billingCacheService.ReleaseInflightBalanceStrict(ctx, userID, pending.BillingReservationID)
 }
 
 // StableGrokVideoBillingRequestID is the durable usage_logs / dedup key for one
@@ -793,6 +813,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		VideoCount:           usage.VideoCount,
 		VideoResolution:      usage.VideoResolution,
 		VideoDurationSeconds: usage.VideoDurationSeconds,
+		MediaStatus:          usage.Status,
 	}, nil
 }
 
@@ -916,6 +937,7 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		UpstreamHeaders: contentResp.Header,
 		ResponseHeaders: contentResp.Header.Clone(),
 		Duration:        time.Since(startTime),
+		MediaStatus:     strings.ToLower(strings.TrimSpace(gjson.GetBytes(statusBody, "status").String())),
 	}
 	if billed := ExtractGrokVideoBillingFromStatusBody(statusBody, nil, requestID); billed != nil {
 		result.ResponseID = firstNonEmpty(billed.ResponseID, strings.TrimSpace(requestID))
@@ -1205,6 +1227,7 @@ type grokMediaUsageMetadata struct {
 	VideoCount           int
 	VideoResolution      string
 	VideoDurationSeconds int
+	Status               string
 }
 
 func grokMediaUsageFromResponse(endpoint GrokMediaEndpoint, requestInfo GrokMediaRequestInfo, responseBody []byte) grokMediaUsageMetadata {
@@ -1223,6 +1246,7 @@ func grokMediaUsageFromResponse(endpoint GrokMediaEndpoint, requestInfo GrokMedi
 		meta.VideoResolution = requestInfo.Resolution
 		meta.VideoDurationSeconds = requestInfo.DurationSeconds
 	case GrokMediaEndpointVideoStatus:
+		meta.Status = strings.ToLower(strings.TrimSpace(gjson.GetBytes(responseBody, "status").String()))
 		// Prefer status-body URL success + upstream duration/resolution when present.
 		if IsGrokVideoStatusBillable(responseBody) {
 			// provisional units; handler merges with pending snapshot before RecordUsage.

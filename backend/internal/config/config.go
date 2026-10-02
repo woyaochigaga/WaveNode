@@ -1178,6 +1178,9 @@ type GatewayCNProvidersConfig struct {
 type GatewayLiveConfig struct {
 	// MaxSessionDurationSeconds 是 Live 会话的硬上限。
 	MaxSessionDurationSeconds int `mapstructure:"max_session_duration_seconds"`
+	// BillingGuardMode 控制 Live 会话的成本护栏：disabled 兼容旧行为，
+	// observe 只记录估算，enforce 在创建前做 Redis 在途预留并在结束时结算。
+	BillingGuardMode string `mapstructure:"billing_guard_mode"`
 }
 
 // GatewayOpenAIHTTP2Config OpenAI HTTP 上游协议配置。
@@ -2423,6 +2426,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)
 	viper.SetDefault("gateway.openai_compact_model", "gpt-5.5")
 	viper.SetDefault("gateway.live.max_session_duration_seconds", 3600)
+	viper.SetDefault("gateway.live.billing_guard_mode", "enforce")
 	// OpenAI Responses WebSocket（默认开启；可通过 force_http 紧急回滚）
 	viper.SetDefault("gateway.openai_ws.enabled", true)
 	viper.SetDefault("gateway.openai_ws.mode_router_v2_enabled", false)
@@ -3096,6 +3100,10 @@ func (c *Config) Validate() error {
 		c.Billing.InflightReservation.MaxOutputTokens < 0 || c.Billing.InflightReservation.MaxInputTokens < 0 ||
 		c.Billing.InflightReservation.MaxReservationUSD < 0 {
 		return fmt.Errorf("billing.inflight_reservation values must be non-negative")
+	}
+	if mode := strings.ToLower(strings.TrimSpace(c.Gateway.Live.BillingGuardMode)); mode != "" &&
+		mode != "disabled" && mode != "observe" && mode != "enforce" {
+		return fmt.Errorf("gateway.live.billing_guard_mode must be disabled, observe, or enforce")
 	}
 	if c.Database.MaxOpenConns <= 0 {
 		return fmt.Errorf("database.max_open_conns must be positive")

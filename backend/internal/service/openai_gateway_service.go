@@ -287,6 +287,8 @@ type OpenAIForwardResult struct {
 	VideoResolution       string
 	// VideoDurationSeconds 是提交时请求的生成时长（xAI 按输出秒数计费），已归一化到 1-15 秒。
 	VideoDurationSeconds int
+	// MediaStatus 保存异步媒体任务状态，供失败、取消、过期路径释放余额预留。
+	MediaStatus string
 	// WebSearchCalls 是 Codex alpha/search 网页搜索调用次数（每次成功请求为 1）。
 	// 上游不返回 usage 字段，>0 时走按次计费（分组单价 × 次数 × 倍率）。
 	WebSearchCalls int
@@ -582,6 +584,19 @@ func NewOpenAIGatewayService(
 	}
 	if openAITokenProvider != nil {
 		openAITokenProvider.SetAccountRuntimeBlocker(svc)
+	}
+	if svc.liveBillingGuardMode() != LiveBillingGuardDisabled {
+		if _, ok := cache.(LiveCallRecoveryStore); ok {
+			go func() {
+				if err := svc.recoverLiveCallsWithRetry(
+					context.Background(),
+					liveRecoveryScanRetryLimit,
+					liveRecoveryScanRetryInitial,
+				); err != nil {
+					logger.FromContext(context.Background()).Warn("Live 会话恢复扫描失败", zap.Error(err))
+				}
+			}()
+		}
 	}
 	svc.logOpenAIWSModeBootstrap()
 	return svc

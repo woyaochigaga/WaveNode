@@ -2,11 +2,20 @@ package handler
 
 import (
 	"context"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 )
+
+const asyncMediaReservationTTL = 24 * time.Hour
+
+type asyncMediaBalanceReservation struct {
+	ID     string
+	Amount float64
+}
 
 // inflightReservationEstimator 估算单请求在途预留金额（USD）；false 表示无法定价。
 type inflightReservationEstimator interface {
@@ -94,6 +103,42 @@ func reserveInflightBalanceCtx(
 	return service.WithInflightReservation(ctx, res), res.HandlerDone, nil
 }
 
+// reserveAsyncMediaBalance 为异步视频登记跨请求预留。它不绑定 handler 生命周期，
+// 预留 ID 会写入任务快照，由完成计费、取消或终态失败路径释放。
+func reserveAsyncMediaBalance(
+	ctx context.Context,
+	billing *service.BillingCacheService,
+	estimator inflightReservationEstimator,
+	apiKey *service.APIKey,
+	subscription *service.UserSubscription,
+	req service.InflightEstimateRequest,
+) (*asyncMediaBalanceReservation, error) {
+	if billing == nil || estimator == nil || apiKey == nil || apiKey.User == nil || !billing.InflightReservationEnabled() {
+		return nil, nil
+	}
+	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() && subscription != nil {
+		return nil, nil
+	}
+	estimate, priced := estimator.EstimateInflightReservation(ctx, apiKey, req)
+	if !priced {
+		if billing.InflightReservationFailClosedOnUnpriced() {
+			return nil, service.ErrInsufficientBalance
+		}
+		return nil, nil
+	}
+	if estimate <= 0 {
+		return nil, nil
+	}
+	reservation := &asyncMediaBalanceReservation{
+		ID:     "async-media:" + uuid.NewString(),
+		Amount: estimate,
+	}
+	if err := billing.ReserveInflightBalanceStrict(ctx, apiKey.User.ID, reservation.ID, reservation.Amount, asyncMediaReservationTTL); err != nil {
+		return nil, err
+	}
+	return reservation, nil
+}
+
 // grokMediaInflightEstimate 媒体生成请求的估算输入；状态/内容查询返回空模型（不预留：
 // 查询会为已生成的媒体计费，不能因余额预留而拦截用户取回已付费结果）。
 func grokMediaInflightEstimate(endpoint service.GrokMediaEndpoint, model string, info service.GrokMediaRequestInfo, body []byte) service.InflightEstimateRequest {
@@ -101,6 +146,9 @@ func grokMediaInflightEstimate(endpoint service.GrokMediaEndpoint, model string,
 		return service.InflightEstimateRequest{}
 	}
 	switch endpoint {
+	case service.SeedanceEndpointCreate:
+		// Seedance 按上游实际输出 token 计费，创建时按默认最大输出 token 估算。
+		return tokenInflightEstimate(model, body)
 	case service.GrokMediaEndpointImagesGenerations, service.GrokMediaEndpointImagesEdits:
 		return service.InflightEstimateRequest{Model: model, BodyBytes: len(body), Kind: service.InflightEstimateImage, Units: info.N}
 	default:

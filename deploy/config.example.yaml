@@ -322,6 +322,9 @@ gateway:
   # ChatGPT Frameless Live 单会话硬上限（秒）。
   live:
     max_session_duration_seconds: 3600
+    # Live 计费护栏：enforce=预留并结算，observe=只记录理论成本，disabled=兼容旧路径。
+    # 生产环境建议保持 enforce；显式 0 单价分组会按免费策略记录。
+    billing_guard_mode: "enforce"
   # OpenAI Responses WebSocket 配置（默认开启，可按需回滚到 HTTP）
   openai_ws:
     # 新版 WS mode 路由（默认关闭）。关闭时忽略账号级 WS mode（包括 http_bridge），保持 legacy ctx_pool 行为。

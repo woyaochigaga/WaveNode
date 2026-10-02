@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"path"
@@ -27,6 +28,10 @@ const (
 	liveLeaseRefreshInterval      = 20 * time.Second
 	liveRedisOperationTimeout     = 3 * time.Second
 	liveClosedRecordTTL           = 24 * time.Hour
+	liveBillingRecoveryGrace      = 5 * time.Minute
+	liveRecoveryScanRetryLimit    = 6
+	liveRecoveryScanRetryInitial  = time.Second
+	liveRecoveryScanRetryMax      = 30 * time.Second
 	liveObserverPollInterval      = 250 * time.Millisecond
 	liveObserverStoreRetryLimit   = 5
 	liveUpstreamBodyLimit         = 2 << 20
@@ -34,6 +39,9 @@ const (
 
 // liveObserverStoreRetryInterval 是 var 以便测试缩短 store 报错的重试等待。
 var liveObserverStoreRetryInterval = time.Second
+
+// liveBillingRetryInterval 是结算仓储短暂不可用时的重试间隔，使用变量便于单元测试缩短等待。
+var liveBillingRetryInterval = 30 * time.Second
 
 var (
 	chatGPTLiveCallsURL        = "https://chatgpt.com/backend-api/codex/realtime/calls?intent=quicksilver&architecture=avas"
@@ -102,6 +110,197 @@ func (s *OpenAIGatewayService) liveMaxSessionDuration() time.Duration {
 	return defaultLiveMaxSessionDuration
 }
 
+type liveBillingPlan struct {
+	status              string
+	reservationID       string
+	reservedAmount      float64
+	rateMultiplier      float64
+	realtimePricePerMin float64
+	realtimePriceSet    bool
+	apiKeyQuota         float64
+	apiKeyHasRates      bool
+	platform            string
+}
+
+func (s *OpenAIGatewayService) liveBillingGuardMode() string {
+	if s == nil || s.cfg == nil {
+		// 直接构造的单元测试服务没有完整账务依赖，保留旧的无计费语义。
+		return LiveBillingGuardDisabled
+	}
+	mode := strings.ToLower(strings.TrimSpace(s.cfg.Gateway.Live.BillingGuardMode))
+	if mode == "" {
+		return LiveBillingGuardEnforce
+	}
+	switch mode {
+	case LiveBillingGuardDisabled, LiveBillingGuardObserve, LiveBillingGuardEnforce:
+		return mode
+	default:
+		return LiveBillingGuardEnforce
+	}
+}
+
+// prepareLiveBillingPlan 在上游创建前冻结计费快照。费率和价格一旦写入 Live 记录，
+// 结束时不再读取可能已变化的分组配置，避免长会话跨配置版本产生不可解释账单。
+func (s *OpenAIGatewayService) prepareLiveBillingPlan(
+	ctx context.Context,
+	identity LiveCallIdentity,
+) (*liveBillingPlan, error) {
+	mode := s.liveBillingGuardMode()
+	plan := &liveBillingPlan{
+		status:         mode,
+		apiKeyQuota:    identity.APIKeyQuota,
+		apiKeyHasRates: identity.APIKeyHasRates,
+	}
+	if mode == LiveBillingGuardDisabled {
+		return plan, nil
+	}
+	group := identity.BillingGroup
+	if group == nil || s.billingService == nil {
+		if mode == LiveBillingGuardObserve {
+			return plan, nil
+		}
+		return nil, ErrLiveBillingUnavailable
+	}
+	plan.platform = group.Platform
+	plan.rateMultiplier = group.RateMultiplier
+	if plan.rateMultiplier < 0 || math.IsNaN(plan.rateMultiplier) || math.IsInf(plan.rateMultiplier, 0) {
+		return nil, ErrLiveBillingUnavailable
+	}
+	if group.ID > 0 && s.userGroupRateResolver != nil {
+		plan.rateMultiplier = s.userGroupRateResolver.Resolve(ctx, identity.UserID, group.ID, plan.rateMultiplier)
+	}
+	if plan.rateMultiplier < 0 || math.IsNaN(plan.rateMultiplier) || math.IsInf(plan.rateMultiplier, 0) {
+		return nil, ErrLiveBillingUnavailable
+	}
+	price := group.AudioRealtimePricePerMin
+	if price != nil {
+		if *price < 0 || math.IsNaN(*price) || math.IsInf(*price, 0) {
+			return nil, ErrLiveBillingUnavailable
+		}
+		plan.realtimePriceSet = true
+		plan.realtimePricePerMin = *price
+	}
+	maxMinutes := s.liveMaxSessionDuration().Seconds() / 60
+	priceConfig := &audioPriceConfig{RealtimePerMin: price}
+	maxCost := s.billingService.CalculateAudioCost("realtime", maxMinutes, priceConfig, plan.rateMultiplier)
+	if maxCost == nil || maxCost.TotalCost < 0 || maxCost.ActualCost < 0 ||
+		math.IsNaN(maxCost.TotalCost) || math.IsInf(maxCost.TotalCost, 0) ||
+		math.IsNaN(maxCost.ActualCost) || math.IsInf(maxCost.ActualCost, 0) {
+		return nil, ErrLiveBillingUnavailable
+	}
+	if mode == LiveBillingGuardObserve {
+		plan.status = LiveBillingStatusObserve
+		plan.reservedAmount = maxCost.ActualCost
+		return plan, nil
+	}
+
+	if identity.BillingGroup.IsSubscriptionType() {
+		plan.status = LiveBillingStatusEnforced
+	} else if maxCost.ActualCost > 0 {
+		if s.billingCacheService == nil || s.usageBillingRepo == nil || identity.UserID <= 0 {
+			return nil, ErrLiveBillingUnavailable
+		}
+		plan.reservationID = "live:" + uuid.NewString()
+		plan.reservedAmount = maxCost.ActualCost
+		reservationTTL := s.liveMaxSessionDuration() + liveBillingRecoveryGrace
+		if err := s.billingCacheService.ReserveInflightBalanceStrict(ctx, identity.UserID, plan.reservationID, maxCost.ActualCost, reservationTTL); err != nil {
+			if errors.Is(err, ErrInsufficientBalance) {
+				return nil, err
+			}
+			return nil, ErrLiveBillingUnavailable
+		}
+		plan.status = LiveBillingStatusReserved
+	} else {
+		// 显式配置 realtime_price_per_min=0 表示免费，不把缺失价格静默当成免费。
+		plan.status = LiveBillingStatusFree
+	}
+	return plan, nil
+}
+
+func (s *OpenAIGatewayService) releaseLiveBillingReservation(userID int64, plan *liveBillingPlan) {
+	if plan == nil || plan.reservationID == "" || s == nil || s.billingCacheService == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
+	defer cancel()
+	if err := s.billingCacheService.ReleaseInflightBalanceStrict(ctx, userID, plan.reservationID); err != nil {
+		logger.FromContext(ctx).Warn("Live 计费预留释放失败", zap.Int64("user_id", userID), zap.Error(err))
+	}
+}
+
+// RecoverLiveCalls 在进程启动后重新挂起 Redis 中仍未关闭的会话。
+// 只等待各自 ExpiresAt 再结算，不主动抢占已有 sideband 控制权；多个实例同时恢复
+// 也不会重复扣费，因为统一账单使用 Live call hash 做 request_id 去重。
+func (s *OpenAIGatewayService) RecoverLiveCalls(ctx context.Context) error {
+	if s == nil || ctx == nil || s.liveBillingGuardMode() == LiveBillingGuardDisabled {
+		return nil
+	}
+	store, err := s.liveStore()
+	if err != nil {
+		return err
+	}
+	recoveryStore, ok := store.(LiveCallRecoveryStore)
+	if !ok {
+		return nil
+	}
+	// 扫描全部仍在索引中的会话，不能只按当前 max_session_duration 截断：
+	// 管理员缩短配置后，旧会话的 ExpiresAt 仍可能晚于新配置上限。
+	records, err := recoveryStore.ListLiveCallsForRecovery(ctx, time.UnixMilli(9_000_000_000_000_000_000), 10_000)
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if record == nil || record.Controller == LiveControllerClosed {
+			continue
+		}
+		go s.finalizeLiveCallAfterExpiry(record)
+	}
+	return nil
+}
+
+// recoverLiveCallsWithRetry 覆盖进程启动时 Redis 短暂不可用的窗口。
+// 多实例或重复扫描不会重复扣费，最终结算仍由 usage_billing_dedup 保证幂等。
+func (s *OpenAIGatewayService) recoverLiveCallsWithRetry(
+	ctx context.Context,
+	attempts int,
+	initialDelay time.Duration,
+) error {
+	if attempts <= 0 {
+		attempts = 1
+	}
+	if initialDelay <= 0 {
+		initialDelay = liveRecoveryScanRetryInitial
+	}
+	delay := initialDelay
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if err := s.RecoverLiveCalls(ctx); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		if attempt == attempts-1 {
+			break
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+		if delay < liveRecoveryScanRetryMax {
+			delay *= 2
+			if delay > liveRecoveryScanRetryMax {
+				delay = liveRecoveryScanRetryMax
+			}
+		}
+	}
+	return lastErr
+}
+
 func ValidateLiveCallRequest(request *LiveCallRequest) error {
 	if request == nil || strings.TrimSpace(request.SDP) == "" {
 		return errors.New("sdp is required")
@@ -138,6 +337,16 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 	if err != nil {
 		return nil, err
 	}
+	billingPlan, err := s.prepareLiveBillingPlan(ctx, identity)
+	if err != nil {
+		return nil, err
+	}
+	reservationPersisted := false
+	defer func() {
+		if !reservationPersisted {
+			s.releaseLiveBillingReservation(identity.UserID, billingPlan)
+		}
+	}()
 	attestation, attestationCiphertext, err := s.prepareLiveAttestation(ctx)
 	if err != nil {
 		return nil, err
@@ -213,29 +422,44 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 			model = "gpt-live"
 		}
 		record := &LiveCallRecord{
-			CallID:                created.CallID,
-			CallHash:              hashLiveCallID(created.CallID),
-			AccountID:             account.ID,
-			APIKeyID:              identity.APIKeyID,
-			UserID:                identity.UserID,
-			GroupID:               liveGroupID(identity.GroupID),
-			SubscriptionID:        liveGroupID(identity.SubscriptionID),
-			LeaseID:               leaseID,
-			Model:                 model,
-			CreatedAt:             now,
-			ExpiresAt:             now.Add(s.liveMaxSessionDuration()),
-			Controller:            LiveControllerPending,
-			UserAgent:             identity.UserAgent,
-			IPAddress:             identity.IPAddress,
-			InboundEndpoint:       identity.InboundEndpoint,
-			AttestationCiphertext: attestationCiphertext,
+			CallID:                       created.CallID,
+			CallHash:                     hashLiveCallID(created.CallID),
+			AccountID:                    account.ID,
+			APIKeyID:                     identity.APIKeyID,
+			UserID:                       identity.UserID,
+			GroupID:                      liveGroupID(identity.GroupID),
+			SubscriptionID:               liveGroupID(identity.SubscriptionID),
+			LeaseID:                      leaseID,
+			Model:                        model,
+			CreatedAt:                    now,
+			ExpiresAt:                    now.Add(s.liveMaxSessionDuration()),
+			Controller:                   LiveControllerPending,
+			UserAgent:                    identity.UserAgent,
+			IPAddress:                    identity.IPAddress,
+			InboundEndpoint:              identity.InboundEndpoint,
+			AttestationCiphertext:        attestationCiphertext,
+			BillingGuardStatus:           billingPlan.status,
+			BillingReservationID:         billingPlan.reservationID,
+			BillingReservedAmount:        billingPlan.reservedAmount,
+			BillingRateMultiplier:        billingPlan.rateMultiplier,
+			BillingAccountRateMultiplier: account.BillingRateMultiplier(),
+			BillingRealtimePricePerMin:   billingPlan.realtimePricePerMin,
+			BillingRealtimePriceSet:      billingPlan.realtimePriceSet,
+			BillingAPIKeyQuota:           billingPlan.apiKeyQuota,
+			BillingAPIKeyHasRates:        billingPlan.apiKeyHasRates,
+			BillingAccountType:           account.Type,
+			BillingAccountHasQuota:       account.HasAnyQuotaLimit(),
+			BillingPlatform:              billingPlan.platform,
 		}
 		mappingTTL := s.liveMaxSessionDuration() + 5*time.Minute
 		if saveErr := store.SaveLiveCall(ctx, record, mappingTTL); saveErr != nil {
 			s.releaseLiveLease(account.ID, identity.UserID, identity.APIKeyID, leaseID)
 			return nil, fmt.Errorf("save live call mapping: %w", saveErr)
 		}
+		reservationPersisted = true
 		created.Account = account
+		created.BillingGuardStatus = billingPlan.status
+		created.EstimatedMaxCost = billingPlan.reservedAmount
 		go s.observeLiveCall(record)
 		return created, nil
 	}
@@ -562,7 +786,7 @@ func (s *OpenAIGatewayService) ProxyLiveSideband(
 	cancel()
 	_, _ = store.ReleaseLiveController(context.Background(), record.CallHash, owner)
 	if liveSessionEnded(runErr) || !time.Now().Before(record.ExpiresAt) {
-		s.finalizeLiveCall(record)
+		go s.finalizeLiveCallWithRetry(record)
 		return runErr
 	}
 	go s.observeLiveCall(record)
@@ -654,7 +878,7 @@ func (s *OpenAIGatewayService) observeLiveCall(record *LiveCallRecord) {
 			return
 		}
 		if !time.Now().Before(record.ExpiresAt) {
-			s.finalizeLiveCall(record)
+			s.finalizeLiveCallWithRetry(record)
 			return
 		}
 		upstream, dialErr := s.dialLiveSideband(context.Background(), record)
@@ -670,7 +894,7 @@ func (s *OpenAIGatewayService) observeLiveCall(record *LiveCallRecord) {
 			return
 		}
 		if liveSessionEnded(runErr) {
-			s.finalizeLiveCall(record)
+			s.finalizeLiveCallWithRetry(record)
 			return
 		}
 		if !s.waitForLiveObserverRetry(record) {
@@ -770,7 +994,22 @@ func (s *OpenAIGatewayService) finalizeLiveCallAfterExpiry(record *LiveCallRecor
 	if wait := time.Until(record.ExpiresAt); wait > 0 {
 		time.Sleep(wait)
 	}
-	s.finalizeLiveCall(record)
+	s.finalizeLiveCallWithRetry(record)
+}
+
+// finalizeLiveCallWithRetry 在 Redis 映射与余额预留的恢复窗口内重试结算。
+// usage_billing_dedup 以 call hash 去重，因此多个实例同时执行也只会扣款一次。
+func (s *OpenAIGatewayService) finalizeLiveCallWithRetry(record *LiveCallRecord) {
+	if record == nil {
+		return
+	}
+	deadline := record.ExpiresAt.Add(liveBillingRecoveryGrace)
+	for {
+		if s.finalizeLiveCall(record) || !time.Now().Before(deadline) {
+			return
+		}
+		time.Sleep(liveBillingRetryInterval)
+	}
 }
 
 func (s *OpenAIGatewayService) refreshLiveLease(record *LiveCallRecord) bool {
@@ -781,7 +1020,24 @@ func (s *OpenAIGatewayService) refreshLiveLease(record *LiveCallRecord) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
 	defer cancel()
 	refreshed, err := cache.RefreshLiveLease(ctx, record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
-	return err == nil && refreshed
+	if err != nil || !refreshed {
+		return false
+	}
+	if record.BillingReservationID != "" && s.billingCacheService != nil {
+		reservationTTL := s.liveMaxSessionDuration() + liveBillingRecoveryGrace
+		reservationCtx, reservationCancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
+		alive, renewErr := s.billingCacheService.RenewInflightBalanceStrict(
+			reservationCtx,
+			record.UserID,
+			record.BillingReservationID,
+			reservationTTL,
+		)
+		reservationCancel()
+		if renewErr != nil || !alive {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *OpenAIGatewayService) releaseLiveLease(accountID, userID, apiKeyID int64, leaseID string) {
@@ -794,24 +1050,146 @@ func (s *OpenAIGatewayService) releaseLiveLease(accountID, userID, apiKeyID int6
 	_ = cache.ReleaseLiveLease(ctx, accountID, userID, apiKeyID, leaseID)
 }
 
-func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) {
+func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) bool {
 	if record == nil {
-		return
+		return true
 	}
 	store, err := s.liveStore()
 	if err != nil {
-		return
+		return false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
-	first, err := store.MarkLiveCallClosed(ctx, record.CallHash, liveClosedRecordTTL)
-	cancel()
-	if err != nil || !first {
-		return
+	// 旧记录没有计费快照，继续按兼容路径收口；新记录必须先完成统一账单，
+	// 再标记 closed，避免数据库/Redis 短暂故障把唯一一次结算机会永久吃掉。
+	if record.BillingGuardStatus == "" || record.BillingGuardStatus == LiveBillingGuardDisabled {
+		ctx, cancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
+		first, markErr := store.MarkLiveCallClosed(ctx, record.CallHash, liveClosedRecordTTL)
+		cancel()
+		if markErr != nil {
+			return false
+		}
+		if !first {
+			return true
+		}
+		s.releaseLiveLease(record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
+		writeUsageLogBestEffort(context.Background(), s.usageLogRepo, buildLiveUsageLog(record, &CostBreakdown{}), "service.openai_live")
+		return true
 	}
+
+	duration := int(time.Since(record.CreatedAt).Milliseconds())
+	if duration < 0 {
+		duration = 0
+	}
+	cost, costErr := liveCallCost(s, record, duration)
+	if costErr != nil {
+		s.releaseLiveLease(record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
+		logger.FromContext(context.Background()).Warn("Live 会话计费估算失败，保留记录等待重试", zap.String("call_hash", record.CallHash), zap.Error(costErr))
+		return false
+	}
+	if record.BillingGuardStatus == LiveBillingStatusObserve {
+		// 仅观测模式保留理论原价，但 ActualCost 必须为 0，避免报表把未扣款金额当成收入。
+		observedCost := *cost
+		observedCost.ActualCost = 0
+		cost = &observedCost
+	}
+	if cost.ActualCost > 0 {
+		if s.usageBillingRepo == nil {
+			s.releaseLiveLease(record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
+			logger.FromContext(context.Background()).Warn("Live 统一账单仓储不可用，保留记录等待重试", zap.String("call_hash", record.CallHash))
+			return false
+		}
+		billingCtx, billingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		applyResult, billingErr := s.usageBillingRepo.Apply(billingCtx, buildLiveUsageBillingCommand(record, cost))
+		billingCancel()
+		if billingErr != nil {
+			s.releaseLiveLease(record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
+			logger.FromContext(context.Background()).Warn("Live 会话统一账单失败，保留记录等待重试", zap.String("call_hash", record.CallHash), zap.Error(billingErr))
+			return false
+		}
+		if applyResult == nil {
+			s.releaseLiveLease(record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
+			logger.FromContext(context.Background()).Warn("Live 统一账单返回空结果，保留记录等待重试", zap.String("call_hash", record.CallHash))
+			return false
+		}
+		if applyResult.Applied {
+			syncLiveBillingCaches(s, record, cost)
+		}
+	}
+
+	writeUsageLogBestEffort(context.Background(), s.usageLogRepo, buildLiveUsageLog(record, cost), "service.openai_live")
+	s.releaseLiveBillingReservation(record.UserID, &liveBillingPlan{reservationID: record.BillingReservationID})
 	s.releaseLiveLease(record.AccountID, record.UserID, record.APIKeyID, record.LeaseID)
-	if s.usageLogRepo == nil {
-		return
+	ctx, cancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
+	_, markErr := store.MarkLiveCallClosed(ctx, record.CallHash, liveClosedRecordTTL)
+	cancel()
+	return markErr == nil
+}
+
+func liveCallCost(s *OpenAIGatewayService, record *LiveCallRecord, durationMs int) (*CostBreakdown, error) {
+	if record == nil || record.BillingGuardStatus == LiveBillingStatusFree {
+		return &CostBreakdown{}, nil
 	}
+	// 已成功创建的计价会话至少记 1ms，避免极速取消被静默记为零成本。
+	if durationMs <= 0 {
+		durationMs = 1
+	}
+	if s == nil || s.billingService == nil {
+		return nil, ErrLiveBillingUnavailable
+	}
+	minutes := float64(durationMs) / float64(time.Minute.Milliseconds())
+	var price *float64
+	if record.BillingRealtimePriceSet {
+		value := record.BillingRealtimePricePerMin
+		price = &value
+	}
+	rate := record.BillingRateMultiplier
+	if rate < 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
+		return nil, ErrLiveBillingUnavailable
+	}
+	cost := s.billingService.CalculateAudioCost("realtime", minutes, &audioPriceConfig{RealtimePerMin: price}, rate)
+	if cost == nil || cost.ActualCost < 0 || math.IsNaN(cost.ActualCost) || math.IsInf(cost.ActualCost, 0) {
+		return nil, ErrLiveBillingUnavailable
+	}
+	if record.BillingReservedAmount > 0 && cost.ActualCost > record.BillingReservedAmount {
+		// 超过创建时最大时长时按同一比例截断原价和实付价，保证账号配额与用户扣费同口径。
+		cost.TotalCost *= record.BillingReservedAmount / cost.ActualCost
+		cost.ActualCost = record.BillingReservedAmount
+	}
+	return cost, nil
+}
+
+func buildLiveUsageBillingCommand(record *LiveCallRecord, cost *CostBreakdown) *UsageBillingCommand {
+	cmd := &UsageBillingCommand{
+		RequestID:   record.CallHash,
+		APIKeyID:    record.APIKeyID,
+		UserID:      record.UserID,
+		AccountID:   record.AccountID,
+		AccountType: record.BillingAccountType,
+		Model:       record.Model,
+		BillingType: int8(BillingTypeBalance),
+		MediaType:   "realtime",
+	}
+	if record.SubscriptionID > 0 {
+		cmd.BillingType = int8(BillingTypeSubscription)
+		cmd.SubscriptionID = liveOptionalID(record.SubscriptionID)
+		cmd.SubscriptionCost = cost.ActualCost
+	} else {
+		cmd.BalanceCost = cost.ActualCost
+	}
+	if record.BillingAPIKeyQuota > 0 {
+		cmd.APIKeyQuotaCost = cost.ActualCost
+	}
+	if record.BillingAPIKeyHasRates {
+		cmd.APIKeyRateLimitCost = cost.ActualCost
+	}
+	if record.BillingAccountHasQuota &&
+		(strings.EqualFold(record.BillingAccountType, AccountTypeAPIKey) || strings.EqualFold(record.BillingAccountType, AccountTypeBedrock)) {
+		cmd.AccountQuotaCost = cost.TotalCost * record.BillingAccountRateMultiplier
+	}
+	cmd.Normalize()
+	return cmd
+}
+
+func buildLiveUsageLog(record *LiveCallRecord, cost *CostBreakdown) *UsageLog {
 	duration := int(time.Since(record.CreatedAt).Milliseconds())
 	if duration < 0 {
 		duration = 0
@@ -824,31 +1202,51 @@ func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) {
 	if record.SubscriptionID > 0 {
 		billingType = BillingTypeSubscription
 	}
-	// TODO(billing): Live 会话目前不计费：TotalCost/ActualCost 恒为 0，完全绕过
-	// recordUsageCore/applyUsageBilling，余额模式下极低余额也能反复开启最长
-	// liveMaxSessionDuration 的会话。若确认按时长计费，应在此接入计费管道；
-	// 若确认有意免费，删除本注释即可（零值行为由
-	// TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage 锁定）。
-	//
-	// 这是该会话唯一一次落库机会（MarkLiveCallClosed 已标记 first），失败即永久
-	// 丢失，因此走带日志与同步兜底的 writeUsageLogBestEffort（issue #3656）。
-	writeUsageLogBestEffort(context.Background(), s.usageLogRepo, &UsageLog{
-		UserID:           record.UserID,
-		APIKeyID:         record.APIKeyID,
-		AccountID:        record.AccountID,
-		RequestID:        record.CallHash,
-		Model:            record.Model,
-		RequestedModel:   record.Model,
-		GroupID:          liveOptionalID(record.GroupID),
-		SubscriptionID:   liveOptionalID(record.SubscriptionID),
-		RateMultiplier:   1,
-		BillingType:      billingType,
-		RequestType:      RequestTypeLive,
-		DurationMs:       &duration,
-		UserAgent:        &userAgent,
-		IPAddress:        &ipAddress,
-		InboundEndpoint:  &inboundEndpoint,
-		UpstreamEndpoint: &upstreamEndpoint,
-		CreatedAt:        record.CreatedAt,
-	}, "service.openai_live")
+	billingMode := cost.BillingMode
+	mediaType := "realtime"
+	accountRate := record.BillingAccountRateMultiplier
+	return &UsageLog{
+		UserID:                record.UserID,
+		APIKeyID:              record.APIKeyID,
+		AccountID:             record.AccountID,
+		RequestID:             record.CallHash,
+		Model:                 record.Model,
+		RequestedModel:        record.Model,
+		GroupID:               liveOptionalID(record.GroupID),
+		SubscriptionID:        liveOptionalID(record.SubscriptionID),
+		RateMultiplier:        record.BillingRateMultiplier,
+		AccountRateMultiplier: &accountRate,
+		TotalCost:             cost.TotalCost,
+		ActualCost:            cost.ActualCost,
+		BillingType:           billingType,
+		BillingMode:           &billingMode,
+		MediaType:             &mediaType,
+		RequestType:           RequestTypeLive,
+		DurationMs:            &duration,
+		UserAgent:             &userAgent,
+		IPAddress:             &ipAddress,
+		InboundEndpoint:       &inboundEndpoint,
+		UpstreamEndpoint:      &upstreamEndpoint,
+		CreatedAt:             record.CreatedAt,
+	}
+}
+
+func syncLiveBillingCaches(s *OpenAIGatewayService, record *LiveCallRecord, cost *CostBreakdown) {
+	if s == nil || s.billingCacheService == nil || cost == nil || cost.ActualCost <= 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), liveRedisOperationTimeout)
+	defer cancel()
+	if record.SubscriptionID > 0 && record.GroupID > 0 {
+		s.billingCacheService.QueueUpdateSubscriptionUsage(record.UserID, record.GroupID, cost.ActualCost)
+	} else {
+		_ = s.billingCacheService.InvalidateUserBalance(ctx, record.UserID)
+	}
+	if record.BillingAPIKeyHasRates {
+		_ = s.billingCacheService.InvalidateAPIKeyRateLimit(ctx, record.APIKeyID)
+	}
+	if record.BillingPlatform != "" && record.SubscriptionID == 0 &&
+		s.billingCacheService.HasUserPlatformQuotaLimit(ctx, record.UserID, record.BillingPlatform) {
+		s.billingCacheService.IncrementUserPlatformQuotaUsage(record.UserID, record.BillingPlatform, cost.ActualCost)
+	}
 }
