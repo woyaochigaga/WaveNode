@@ -11,6 +11,8 @@ const {
   deleteBackup,
   listBackups,
   getDownloadURL,
+  getPreflight,
+  verifyBackup,
 } = vi.hoisted(() => ({
   getS3Config: vi.fn(),
   getImageStorageConfig: vi.fn(),
@@ -19,6 +21,8 @@ const {
   deleteBackup: vi.fn(),
   listBackups: vi.fn(),
   getDownloadURL: vi.fn(),
+  getPreflight: vi.fn(),
+  verifyBackup: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
@@ -35,6 +39,8 @@ vi.mock('@/api', () => ({
       createBackup: vi.fn(),
       listBackups,
       getBackup: vi.fn(),
+      getPreflight,
+      verifyBackup,
       deleteBackup,
       getDownloadURL,
       restoreBackup: vi.fn(),
@@ -99,6 +105,13 @@ describe('admin BackupView', () => {
     deleteBackup.mockReset().mockResolvedValue(undefined)
     listBackups.mockResolvedValue({ items: [] })
     getDownloadURL.mockReset()
+    getPreflight.mockResolvedValue({
+      operation_id: 'preflight-1',
+      ready: true,
+      checked_at: '2026-10-02T00:00:00Z',
+      checks: [{ name: 'database', status: 'pass', blocking: true, detail: 'ok' }],
+    })
+    verifyBackup.mockReset()
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   })
 
@@ -136,6 +149,26 @@ describe('admin BackupView', () => {
     expect(document.body.querySelector('a[href="https://example.test/part-2"]')).not.toBeNull()
   })
 
+  it('显示 preflight 结果，并在恢复前要求通过临时库演练', async () => {
+    const record = baseRecord('verified')
+    listBackups.mockResolvedValue({ items: [record] })
+    verifyBackup.mockResolvedValue({ ...record, verification_status: 'running' })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    const wrapper = mountBackupView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="backup-preflight"]').text()).toContain('admin.backup.preflight.ready')
+    const restore = wrapper.findAll('button').find(button => button.text() === 'admin.backup.actions.restore')!
+    expect(restore.attributes('disabled')).toBeDefined()
+    const verify = wrapper.findAll('button').find(button => button.text() === 'admin.backup.actions.verify')!
+    await verify.trigger('click')
+    await flushPromises()
+
+    expect(confirm).toHaveBeenCalledWith('admin.backup.actions.verifyConfirm')
+    expect(verifyBackup).toHaveBeenCalledWith('verified')
+  })
+
   it('旧单文件记录仍使用单个下载地址', async () => {
     listBackups.mockResolvedValue({ items: [baseRecord('legacy')] })
     getDownloadURL.mockResolvedValue({ url: 'https://example.test/legacy.sql.gz' })
@@ -160,7 +193,7 @@ describe('admin BackupView', () => {
     const wrapper = mountBackupView()
     await flushPromises()
 
-    expect(wrapper.find('tbody tr td:nth-child(5)').text()).toBe('-')
+    expect(wrapper.find('tbody tr td:nth-child(6)').text()).toBe('-')
     expect(wrapper.findAll('button').some(button => button.text() === 'common.delete')).toBe(false)
   })
 
@@ -268,7 +301,7 @@ describe('admin BackupView', () => {
     const wrapper = mountBackupView()
     await flushPromises()
     expect(wrapper.text()).toContain('admin.backup.archive.badge')
-    expect(wrapper.get('tbody tr td:nth-child(6)').text()).toBe('admin.backup.archive.retainLatest')
+    expect(wrapper.get('tbody tr td:nth-child(7)').text()).toBe('admin.backup.archive.retainLatest')
     const button = wrapper.findAll('button').find(button => button.text() === 'common.delete')!
     await button.trigger('click')
     expect(confirm).toHaveBeenCalledWith('admin.backup.archive.deleteConfirm')

@@ -49,13 +49,14 @@ const (
 )
 
 var (
-	ErrBackupS3NotConfigured  = infraerrors.BadRequest("BACKUP_S3_NOT_CONFIGURED", "backup S3 storage is not configured")
-	ErrBackupNotFound         = infraerrors.NotFound("BACKUP_NOT_FOUND", "backup record not found")
-	ErrBackupInProgress       = infraerrors.Conflict("BACKUP_IN_PROGRESS", "a backup is already in progress")
-	ErrRestoreInProgress      = infraerrors.Conflict("RESTORE_IN_PROGRESS", "a restore is already in progress")
-	ErrBackupRecordsCorrupt   = infraerrors.InternalServer("BACKUP_RECORDS_CORRUPT", "backup records data is corrupted")
-	ErrBackupS3ConfigCorrupt  = infraerrors.InternalServer("BACKUP_S3_CONFIG_CORRUPT", "backup S3 config data is corrupted")
-	ErrBackupArchiveProtected = infraerrors.Conflict("BACKUP_ARCHIVE_PROTECTED", "explicit confirmation is required to delete an archived backup")
+	ErrBackupS3NotConfigured      = infraerrors.BadRequest("BACKUP_S3_NOT_CONFIGURED", "backup S3 storage is not configured")
+	ErrBackupNotFound             = infraerrors.NotFound("BACKUP_NOT_FOUND", "backup record not found")
+	ErrBackupInProgress           = infraerrors.Conflict("BACKUP_IN_PROGRESS", "a backup is already in progress")
+	ErrRestoreInProgress          = infraerrors.Conflict("RESTORE_IN_PROGRESS", "a restore is already in progress")
+	ErrBackupRecordsCorrupt       = infraerrors.InternalServer("BACKUP_RECORDS_CORRUPT", "backup records data is corrupted")
+	ErrBackupS3ConfigCorrupt      = infraerrors.InternalServer("BACKUP_S3_CONFIG_CORRUPT", "backup S3 config data is corrupted")
+	ErrBackupArchiveProtected     = infraerrors.Conflict("BACKUP_ARCHIVE_PROTECTED", "explicit confirmation is required to delete an archived backup")
+	ErrBackupVerificationRequired = infraerrors.Conflict("BACKUP_VERIFICATION_REQUIRED", "backup must pass a temporary database recovery verification before restore")
 
 	// ErrSecretEncryptionKeyNotConfigured is returned when an S3 SecretAccessKey
 	// would be encrypted with an auto-generated (ephemeral) key. That key is
@@ -76,6 +77,23 @@ var (
 type DBDumper interface {
 	Dump(ctx context.Context) (io.ReadCloser, error)
 	Restore(ctx context.Context, data io.Reader) error
+}
+
+// BackupDatabaseInspector 提供备份前的只读数据库快照，由 PostgreSQL 实现返回
+// 数据库版本、迁移版本、关键表行数和未结算任务数量。
+type BackupDatabaseInspector interface {
+	InspectDatabase(ctx context.Context) (*BackupDatabaseSnapshot, error)
+}
+
+// BackupRecoveryVerifier 将备份恢复到隔离的临时数据库并执行 smoke test。
+// 生产 PgDumper 实现该接口；不支持临时库的自定义 dumper 不能签发恢复演练通过状态。
+type BackupRecoveryVerifier interface {
+	VerifyRestore(ctx context.Context, data io.Reader, expected *BackupManifest) (*BackupRecoveryReport, error)
+}
+
+// BackupCacheHealthChecker 是 Redis 锁实现提供的只读健康检查能力。
+type BackupCacheHealthChecker interface {
+	BackupHealthCheck(ctx context.Context) error
 }
 
 // BackupObjectStore abstracts object storage for backup files
@@ -138,6 +156,16 @@ type BackupRecord struct {
 	RestoreError     string                `json:"restore_error,omitempty"`
 	RestoredAt       string                `json:"restored_at,omitempty"`
 	MonthlyArchive   *BackupMonthlyArchive `json:"monthly_archive,omitempty"`
+	OperationID      string                `json:"operation_id,omitempty"`
+	Manifest         *BackupManifest       `json:"manifest,omitempty"`
+
+	VerificationStatus      string                `json:"verification_status,omitempty"` // "", running, passed, failed
+	VerificationOperationID string                `json:"verification_operation_id,omitempty"`
+	VerificationStartedAt   string                `json:"verification_started_at,omitempty"`
+	VerificationError       string                `json:"verification_error,omitempty"`
+	VerifiedAt              string                `json:"verified_at,omitempty"`
+	VerificationReport      *BackupRecoveryReport `json:"verification_report,omitempty"`
+	RestoreOperationID      string                `json:"restore_operation_id,omitempty"`
 }
 
 // BackupDownloadPart 描述一个可下载的备份分卷。
@@ -650,9 +678,19 @@ func (s *BackupService) createBackup(ctx context.Context, triggeredBy string, ex
 		TriggeredBy: triggeredBy,
 		StartedAt:   now.Format(time.RFC3339),
 		ExpiresAt:   expiresAt,
+		OperationID: uuid.NewString(),
 	}
+	manifest, err := s.captureBackupManifest(ctx)
+	if err != nil {
+		record.Status = "failed"
+		record.ErrorMsg = err.Error()
+		record.FinishedAt = time.Now().Format(time.RFC3339)
+		_ = s.saveRecord(ctx, record)
+		return record, err
+	}
+	record.Manifest = manifest
 
-	archivePath, sizeBytes, err := s.createCompressedBackupFile(ctx)
+	archivePath, sizeBytes, checksum, err := s.createCompressedBackupFile(ctx)
 	if err != nil {
 		record.Status = "failed"
 		record.ErrorMsg = err.Error()
@@ -662,6 +700,8 @@ func (s *BackupService) createBackup(ctx context.Context, triggeredBy string, ex
 	}
 	defer func() { _ = cleanupBackupFiles(archivePath) }()
 	record.SizeBytes = sizeBytes
+	record.Manifest.SHA256 = checksum
+	record.Manifest.SizeBytes = sizeBytes
 	if err := s.saveRecord(ctx, record); err != nil {
 		return nil, fmt.Errorf("save initial record: %w", err)
 	}
@@ -740,7 +780,18 @@ func (s *BackupService) StartBackup(ctx context.Context, triggeredBy string, exp
 		StartedAt:   now.Format(time.RFC3339),
 		ExpiresAt:   expiresAt,
 		Progress:    "pending",
+		OperationID: uuid.NewString(),
 	}
+	manifest, err := s.captureBackupManifest(ctx)
+	if err != nil {
+		record.Status = "failed"
+		record.ErrorMsg = err.Error()
+		record.Progress = ""
+		record.FinishedAt = time.Now().Format(time.RFC3339)
+		_ = s.saveRecord(ctx, record)
+		return record, err
+	}
+	record.Manifest = manifest
 
 	if err := s.saveRecord(ctx, record); err != nil {
 		return nil, fmt.Errorf("save initial record: %w", err)
@@ -782,7 +833,7 @@ func (s *BackupService) executeBackup(record *BackupRecord, objectStore BackupOb
 	// 阶段1: pg_dump -> gzip 临时文件
 	record.Progress = "dumping"
 	_ = s.saveRecord(ctx, record)
-	archivePath, sizeBytes, err := s.createCompressedBackupFile(ctx)
+	archivePath, sizeBytes, checksum, err := s.createCompressedBackupFile(ctx)
 	if err != nil {
 		record.Status = "failed"
 		record.ErrorMsg = err.Error()
@@ -793,6 +844,8 @@ func (s *BackupService) executeBackup(record *BackupRecord, objectStore BackupOb
 	}
 	defer func() { _ = cleanupBackupFiles(archivePath) }()
 	record.SizeBytes = sizeBytes
+	record.Manifest.SHA256 = checksum
+	record.Manifest.SizeBytes = sizeBytes
 
 	// 阶段2: 单对象或分卷上传
 	record.Progress = "uploading"
@@ -815,15 +868,15 @@ func (s *BackupService) executeBackup(record *BackupRecord, objectStore BackupOb
 	}
 }
 
-func (s *BackupService) createCompressedBackupFile(ctx context.Context) (string, int64, error) {
+func (s *BackupService) createCompressedBackupFile(ctx context.Context) (string, int64, string, error) {
 	dumpReader, err := s.dumper.Dump(ctx)
 	if err != nil {
-		return "", 0, fmt.Errorf("pg_dump: %w", err)
+		return "", 0, "", fmt.Errorf("pg_dump: %w", err)
 	}
 	archive, err := os.CreateTemp("", "sub2api-backup-*.sql.gz")
 	if err != nil {
 		_ = dumpReader.Close()
-		return "", 0, fmt.Errorf("create backup archive: %w", err)
+		return "", 0, "", fmt.Errorf("create backup archive: %w", err)
 	}
 	archivePath := archive.Name()
 
@@ -840,15 +893,20 @@ func (s *BackupService) createCompressedBackupFile(ctx context.Context) (string,
 	}
 	if copyErr != nil {
 		_ = cleanupBackupFiles(archivePath)
-		return "", 0, fmt.Errorf("gzip/dump failed: %w", copyErr)
+		return "", 0, "", fmt.Errorf("gzip/dump failed: %w", copyErr)
 	}
 
 	info, err := os.Stat(archivePath)
 	if err != nil {
 		_ = cleanupBackupFiles(archivePath)
-		return "", 0, fmt.Errorf("stat backup archive: %w", err)
+		return "", 0, "", fmt.Errorf("stat backup archive: %w", err)
 	}
-	return archivePath, info.Size(), nil
+	checksum, err := backupFileSHA256(archivePath)
+	if err != nil {
+		_ = cleanupBackupFiles(archivePath)
+		return "", 0, "", err
+	}
+	return archivePath, info.Size(), checksum, nil
 }
 
 func (s *BackupService) uploadBackupArchive(ctx context.Context, record *BackupRecord, objectStore BackupObjectStore, cfg *BackupS3Config, archivePath string) error {
@@ -861,11 +919,18 @@ func (s *BackupService) uploadBackupArchive(ctx context.Context, record *BackupR
 		partSize = defaultBackupPartSizeBytes
 	}
 	if info.Size() <= partSize {
-		if _, err := objectStore.UploadFile(ctx, record.S3Key, archivePath, "application/gzip"); err != nil {
+		uploaded, err := objectStore.UploadFile(ctx, record.S3Key, archivePath, "application/gzip")
+		if err != nil {
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), backupObjectCleanupTimeout)
 			cleanupErr := deleteBackupObjectKeys(cleanupCtx, objectStore, record)
 			cleanupCancel()
 			return errors.Join(fmt.Errorf("backup upload: %w", err), cleanupErr)
+		}
+		if uploaded != info.Size() {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), backupObjectCleanupTimeout)
+			cleanupErr := deleteBackupObjectKeys(cleanupCtx, objectStore, record)
+			cleanupCancel()
+			return errors.Join(fmt.Errorf("backup upload size mismatch: got %d, want %d", uploaded, info.Size()), cleanupErr)
 		}
 		record.Parts = nil
 		return nil
@@ -901,13 +966,20 @@ func (s *BackupService) uploadBackupArchive(ctx context.Context, record *BackupR
 		return fmt.Errorf("save split backup plan: %w", err)
 	}
 	for i, part := range localParts {
-		if _, err := objectStore.UploadFile(ctx, record.Parts[i].S3Key, part.Path, "application/octet-stream"); err != nil {
+		uploaded, err := objectStore.UploadFile(ctx, record.Parts[i].S3Key, part.Path, "application/octet-stream")
+		if err != nil {
 			// PUT 可能已经在对象存储端成功、但客户端因超时收到错误；
 			// 因此失败时清理整份分卷计划，而不只清理此前返回成功的卷。
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), backupObjectCleanupTimeout)
 			cleanupErr := deleteBackupObjectKeys(cleanupCtx, objectStore, record)
 			cleanupCancel()
 			return errors.Join(fmt.Errorf("upload backup part %d: %w", part.Index, err), cleanupErr)
+		}
+		if uploaded != part.SizeBytes {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), backupObjectCleanupTimeout)
+			cleanupErr := deleteBackupObjectKeys(cleanupCtx, objectStore, record)
+			cleanupCancel()
+			return errors.Join(fmt.Errorf("backup part %d upload size mismatch: got %d, want %d", part.Index, uploaded, part.SizeBytes), cleanupErr)
 		}
 	}
 	return nil
@@ -917,7 +989,7 @@ func (s *BackupService) buildBackupPartKey(root string, index int) string {
 	return fmt.Sprintf("%s/payload.part-%06d", strings.TrimRight(root, "/"), index)
 }
 
-// RestoreBackup 从 S3 下载备份并流式恢复到数据库
+// RestoreBackup 从 S3 下载备份，校验完整性后恢复到数据库。
 func (s *BackupService) RestoreBackup(ctx context.Context, backupID string) error {
 	s.opMu.Lock()
 	if s.restoring {
@@ -939,6 +1011,9 @@ func (s *BackupService) RestoreBackup(ctx context.Context, backupID string) erro
 	if record.Status != "completed" {
 		return infraerrors.BadRequest("BACKUP_NOT_COMPLETED", "can only restore from a completed backup")
 	}
+	if s.requiresRecoveryVerification() && record.VerificationStatus != "passed" {
+		return ErrBackupVerificationRequired
+	}
 
 	s3Cfg, err := s.loadS3Config(ctx)
 	if err != nil {
@@ -949,35 +1024,12 @@ func (s *BackupService) RestoreBackup(ctx context.Context, backupID string) erro
 		return fmt.Errorf("init object store: %w", err)
 	}
 
-	if len(record.Parts) > 0 {
-		archivePath, err := s.downloadBackupParts(ctx, objectStore, record.Parts)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = cleanupBackupFiles(archivePath) }()
-		return s.restoreArchive(ctx, archivePath)
-	}
-
-	// 旧记录从 S3 流式下载
-	body, err := objectStore.Download(ctx, record.S3Key)
+	archivePath, err := s.downloadBackupArchive(ctx, objectStore, record)
 	if err != nil {
-		return fmt.Errorf("S3 download failed: %w", err)
+		return err
 	}
-	defer func() { _ = body.Close() }()
-
-	// 流式解压 gzip -> psql（不将全部数据加载到内存）
-	gzReader, err := gzip.NewReader(body)
-	if err != nil {
-		return fmt.Errorf("gzip reader: %w", err)
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	// 流式恢复
-	if err := s.dumper.Restore(ctx, gzReader); err != nil {
-		return fmt.Errorf("pg restore: %w", err)
-	}
-
-	return nil
+	defer func() { _ = cleanupBackupFiles(archivePath) }()
+	return s.restoreArchive(ctx, archivePath)
 }
 
 // StartRestore 异步恢复备份，立即返回
@@ -1010,6 +1062,9 @@ func (s *BackupService) StartRestore(ctx context.Context, backupID string) (*Bac
 	}
 	if record.Status != "completed" {
 		return nil, infraerrors.BadRequest("BACKUP_NOT_COMPLETED", "can only restore from a completed backup")
+	}
+	if s.requiresRecoveryVerification() && record.VerificationStatus != "passed" {
+		return nil, ErrBackupVerificationRequired
 	}
 
 	s3Cfg, err := s.loadS3Config(ctx)
@@ -1057,51 +1112,14 @@ func (s *BackupService) StartRestore(ctx context.Context, backupID string) (*Bac
 func (s *BackupService) executeRestore(record *BackupRecord, objectStore BackupObjectStore) {
 	ctx, cancel := context.WithTimeout(s.bgCtx, 30*time.Minute)
 	defer cancel()
-
-	if len(record.Parts) > 0 {
-		archivePath, err := s.downloadBackupParts(ctx, objectStore, record.Parts)
-		if err != nil {
-			record.RestoreStatus = "failed"
-			record.RestoreError = err.Error()
-			_ = s.saveRestoreRecord(context.Background(), record)
-			return
-		}
+	archivePath, err := s.downloadBackupArchive(ctx, objectStore, record)
+	if err == nil {
 		defer func() { _ = cleanupBackupFiles(archivePath) }()
-		if err := s.restoreArchive(ctx, archivePath); err != nil {
-			record.RestoreStatus = "failed"
-			record.RestoreError = fmt.Sprintf("pg restore: %v", err)
-			_ = s.saveRestoreRecord(context.Background(), record)
-			return
-		}
-		record.RestoreStatus = "completed"
-		record.RestoredAt = time.Now().Format(time.RFC3339)
-		if err := s.saveRestoreRecord(context.Background(), record); err != nil {
-			logger.LegacyPrintf("service.backup", "[Backup] 保存恢复记录失败: %v", err)
-		}
-		return
+		err = s.restoreArchive(ctx, archivePath)
 	}
-
-	body, err := objectStore.Download(ctx, record.S3Key)
 	if err != nil {
 		record.RestoreStatus = "failed"
-		record.RestoreError = fmt.Sprintf("S3 download failed: %v", err)
-		_ = s.saveRestoreRecord(context.Background(), record)
-		return
-	}
-	defer func() { _ = body.Close() }()
-
-	gzReader, err := gzip.NewReader(body)
-	if err != nil {
-		record.RestoreStatus = "failed"
-		record.RestoreError = fmt.Sprintf("gzip reader: %v", err)
-		_ = s.saveRestoreRecord(context.Background(), record)
-		return
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	if err := s.dumper.Restore(ctx, gzReader); err != nil {
-		record.RestoreStatus = "failed"
-		record.RestoreError = fmt.Sprintf("pg restore: %v", err)
+		record.RestoreError = err.Error()
 		_ = s.saveRestoreRecord(context.Background(), record)
 		return
 	}

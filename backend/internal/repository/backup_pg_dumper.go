@@ -107,15 +107,23 @@ func discardSQLConnection(conn *sql.Conn) {
 
 // Restore executes psql to restore from a streaming reader
 func (d *PgDumper) Restore(ctx context.Context, data io.Reader) error {
+	return d.restoreToDatabase(ctx, data, d.cfg.DBName)
+}
+
+func (d *PgDumper) restoreToDatabase(ctx context.Context, data io.Reader, database string) error {
 	args := []string{
 		"-h", d.cfg.Host,
 		"-p", fmt.Sprintf("%d", d.cfg.Port),
 		"-U", d.cfg.User,
-		"-d", d.cfg.DBName,
+		"-d", database,
 		"--single-transaction",
 	}
 
-	cmd := exec.CommandContext(ctx, "psql", args...)
+	commandContext := d.commandContext
+	if commandContext == nil {
+		commandContext = exec.CommandContext
+	}
+	cmd := commandContext(ctx, "psql", args...)
 	if d.cfg.Password != "" {
 		cmd.Env = append(cmd.Environ(), "PGPASSWORD="+d.cfg.Password)
 	}

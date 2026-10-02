@@ -654,8 +654,10 @@ func registerBackupRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAut
 		// 备份操作
 		backup.POST("", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.CreateBackup)
 		backup.GET("", h.Admin.Backup.ListBackups)
+		backup.GET("/preflight", h.Admin.Backup.GetPreflight)
 		backup.GET("/:id", h.Admin.Backup.GetBackup)
 		backup.DELETE("/:id", h.Admin.Backup.DeleteBackup)
+		backup.POST("/:id/verify", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.VerifyBackup)
 		// 备份下载链接可直接取走整库数据——要求 step-up 2FA
 		backup.GET("/:id/download-url", gin.HandlerFunc(stepUpAuth), h.Admin.Backup.GetDownloadURL)
 

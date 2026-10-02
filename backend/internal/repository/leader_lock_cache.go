@@ -40,3 +40,8 @@ func (c *leaderLockCache) TryAcquireLeaderLock(ctx context.Context, key, owner s
 func (c *leaderLockCache) ReleaseLeaderLock(ctx context.Context, key, owner string) error {
 	return leaderLockReleaseScript.Run(ctx, c.rdb, []string{leaderLockKeyPrefix + key}, owner).Err()
 }
+
+// BackupHealthCheck 为备份 preflight 提供只读 Redis 连通性检查。
+func (c *leaderLockCache) BackupHealthCheck(ctx context.Context) error {
+	return c.rdb.Ping(ctx).Err()
+}

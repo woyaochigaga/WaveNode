@@ -104,3 +104,16 @@ func cleanupBackupFiles(paths ...string) error {
 	}
 	return errors.Join(errs...)
 }
+
+func backupFileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("open backup archive for checksum: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("checksum backup archive: %w", err)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}

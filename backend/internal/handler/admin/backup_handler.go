@@ -134,6 +134,31 @@ func (h *BackupHandler) GetBackup(c *gin.Context) {
 	response.Success(c, record)
 }
 
+// GetPreflight 返回迁移/恢复前的只读环境检查，不触发备份或数据库写入。
+func (h *BackupHandler) GetPreflight(c *gin.Context) {
+	report, err := h.backupService.RunPreflight(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, report)
+}
+
+// VerifyBackup 在隔离的临时 PostgreSQL 数据库执行恢复演练。
+func (h *BackupHandler) VerifyBackup(c *gin.Context) {
+	backupID := c.Param("id")
+	if backupID == "" {
+		response.BadRequest(c, "backup ID is required")
+		return
+	}
+	record, err := h.backupService.StartBackupVerification(c.Request.Context(), backupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Accepted(c, record)
+}
+
 func (h *BackupHandler) DeleteBackup(c *gin.Context) {
 	backupID := c.Param("id")
 	if backupID == "" {

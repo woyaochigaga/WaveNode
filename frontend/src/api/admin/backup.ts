@@ -49,6 +49,55 @@ export interface BackupRecord {
   restore_error?: string
   restored_at?: string
   monthly_archive?: BackupMonthlyArchive
+  operation_id?: string
+  manifest?: BackupManifest
+  verification_status?: '' | 'running' | 'passed' | 'failed'
+  verification_operation_id?: string
+  verification_started_at?: string
+  verification_error?: string
+  verified_at?: string
+  verification_report?: BackupRecoveryReport
+  restore_operation_id?: string
+}
+
+export interface BackupManifest {
+  sha256: string
+  size_bytes: number
+  database_version?: string
+  current_migration?: string
+  target_migration?: string
+  database_size_bytes?: number
+  table_rows?: Record<string, number>
+  captured_at: string
+}
+
+export interface BackupRecoveryReport {
+  database_version: string
+  migration_version: string
+  table_rows: Record<string, number>
+  checks: Array<{ name: string; status: string; detail: string }>
+}
+
+export interface BackupPreflightCheck {
+  name: string
+  status: 'pass' | 'warn' | 'fail'
+  blocking: boolean
+  detail: string
+}
+
+export interface BackupPreflightReport {
+  operation_id: string
+  ready: boolean
+  checked_at: string
+  current_migration?: string
+  target_migration?: string
+  database_version?: string
+  database_size_bytes?: number
+  disk_free_bytes?: number
+  latest_backup_at?: string
+  latest_backup_age_seconds?: number
+  unsettled_tasks?: Record<string, number>
+  checks: BackupPreflightCheck[]
 }
 
 export interface BackupPart {
@@ -167,6 +216,16 @@ export async function getBackup(id: string): Promise<BackupRecord> {
   return data
 }
 
+export async function getPreflight(): Promise<BackupPreflightReport> {
+  const { data } = await apiClient.get<BackupPreflightReport>('/admin/backups/preflight')
+  return data
+}
+
+export async function verifyBackup(id: string): Promise<BackupRecord> {
+  const { data } = await apiClient.post<BackupRecord>(`/admin/backups/${id}/verify`)
+  return data
+}
+
 export async function deleteBackup(id: string, deleteArchived = false): Promise<void> {
   await apiClient.delete(`/admin/backups/${id}`, deleteArchived ? { params: { delete_archived: true } } : undefined)
 }
@@ -194,6 +253,8 @@ export const backupAPI = {
   createBackup,
   listBackups,
   getBackup,
+  getPreflight,
+  verifyBackup,
   deleteBackup,
   getDownloadURL,
   restoreBackup,

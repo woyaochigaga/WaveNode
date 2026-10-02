@@ -1,5 +1,46 @@
 <template>
     <div class="space-y-6">
+      <section class="border-y border-gray-200 py-4 dark:border-dark-700" data-testid="backup-preflight">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                {{ t('admin.backup.preflight.title') }}
+              </h3>
+              <span
+                v-if="preflight"
+                class="rounded-full px-2 py-0.5 text-xs font-medium"
+                :class="preflight.ready ? statusClass('completed') : statusClass('failed')"
+              >
+                {{ t(preflight.ready ? 'admin.backup.preflight.ready' : 'admin.backup.preflight.blocked') }}
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.backup.preflight.description') }}
+            </p>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingPreflight" @click="loadPreflight">
+            {{ loadingPreflight ? t('common.loading') : t('admin.backup.preflight.refresh') }}
+          </button>
+        </div>
+        <div v-if="preflight" class="mt-4 divide-y divide-gray-100 border-y border-gray-100 dark:divide-dark-800 dark:border-dark-800">
+          <div
+            v-for="check in preflight.checks"
+            :key="check.name"
+            class="grid gap-1 py-2 text-sm md:grid-cols-[11rem_5rem_1fr] md:items-center"
+          >
+            <span class="font-medium text-gray-800 dark:text-gray-200">{{ t(`admin.backup.preflight.checks.${check.name}`) }}</span>
+            <span class="w-fit rounded-full px-2 py-0.5 text-xs font-medium" :class="preflightCheckClass(check.status)">
+              {{ t(`admin.backup.preflight.status.${check.status}`) }}
+            </span>
+            <span class="text-gray-500 dark:text-gray-400">{{ check.detail }}</span>
+          </div>
+        </div>
+        <p v-else-if="preflightError" class="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+          {{ preflightError }}
+        </p>
+      </section>
+
       <!-- S3 Storage Config -->
       <div class="card p-6">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -206,6 +247,7 @@
               <tr class="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:text-gray-400">
                 <th class="py-2 pr-4">ID</th>
                 <th class="py-2 pr-4">{{ t('admin.backup.columns.status') }}</th>
+                <th class="py-2 pr-4">{{ t('admin.backup.columns.recovery') }}</th>
                 <th class="py-2 pr-4">{{ t('admin.backup.columns.fileName') }}</th>
                 <th class="py-2 pr-4">{{ t('admin.backup.columns.size') }}</th>
                 <th class="py-2 pr-4">{{ t('admin.backup.columns.parts') }}</th>
@@ -227,6 +269,20 @@
                       ? t(`admin.backup.progress.${record.progress}`)
                       : t(`admin.backup.status.${record.status}`) }}
                   </span>
+                </td>
+                <td class="py-3 pr-4 text-xs">
+                  <span
+                    class="rounded-full px-2 py-0.5 font-medium"
+                    :class="verificationClass(record.verification_status)"
+                  >
+                    {{ t(`admin.backup.verification.${record.verification_status || 'pending'}`) }}
+                  </span>
+                  <div v-if="record.manifest?.sha256" class="mt-1 font-mono text-[11px] text-gray-400" :title="record.manifest.sha256">
+                    SHA-256 {{ record.manifest.sha256.slice(0, 10) }}...
+                  </div>
+                  <div v-if="record.verification_error" class="mt-1 max-w-56 text-red-600 dark:text-red-400" :title="record.verification_error">
+                    {{ record.verification_error }}
+                  </div>
                 </td>
                 <td class="py-3 pr-4 text-xs">
                   {{ record.file_name }}
@@ -258,7 +314,20 @@
                       v-if="record.status === 'completed'"
                       type="button"
                       class="btn btn-secondary btn-xs"
-                      :disabled="restoringId === record.id"
+                      :disabled="verifyingId === record.id || record.verification_status === 'running'"
+                      @click="verifyBackup(record.id)"
+                    >
+                      {{ verifyingId === record.id || record.verification_status === 'running'
+                        ? t('admin.backup.actions.verifying')
+                        : t('admin.backup.actions.verify') }}
+                    </button>
+                    <button
+                      v-if="record.status === 'completed'"
+                      type="button"
+                      class="btn btn-secondary btn-xs"
+                      :disabled="restoringId === record.id || record.verification_status !== 'passed'"
+                      :title="record.verification_status === 'passed' ? '' : t('admin.backup.actions.restoreRequiresVerification')"
+                      :aria-disabled="record.verification_status !== 'passed'"
                       @click="restoreBackup(record.id)"
                     >
                       {{ restoringId === record.id ? t('common.loading') : t('admin.backup.actions.restore') }}
@@ -275,7 +344,7 @@
                 </td>
               </tr>
               <tr v-if="backups.length === 0">
-                <td colspan="9" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <td colspan="10" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                   {{ t('admin.backup.empty') }}
                 </td>
               </tr>
@@ -424,6 +493,7 @@ import type {
   BackupMonthlyArchiveConfig,
   BackupRecord,
   BackupDownloadPart,
+  BackupPreflightReport,
   ImageStorageConfig,
 } from '@/api/admin/backup'
 import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from '@/composables/useStepUp'
@@ -526,9 +596,13 @@ const retentionPreview = computed(() => {
 
 // Backups
 const backups = ref<BackupRecord[]>([])
+const preflight = ref<BackupPreflightReport | null>(null)
+const preflightError = ref('')
+const loadingPreflight = ref(false)
 const loadingBackups = ref(false)
 const creatingBackup = ref(false)
 const restoringId = ref('')
+const verifyingId = ref('')
 const manualExpireDays = ref(14)
 const downloadParts = ref<BackupDownloadPart[]>([])
 const downloadPartsModalOpen = ref(false)
@@ -536,6 +610,7 @@ const downloadPartsModalOpen = ref(false)
 // Polling
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const restoringPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const verificationPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const MAX_POLL_COUNT = 900
 
 function updateRecordInList(updated: BackupRecord) {
@@ -617,10 +692,47 @@ function stopRestorePolling() {
   }
 }
 
+function startVerificationPolling(backupId: string) {
+  stopVerificationPolling()
+  let count = 0
+  verificationPollingTimer.value = setInterval(async () => {
+    if (count++ >= MAX_POLL_COUNT) {
+      stopVerificationPolling()
+      verifyingId.value = ''
+      appStore.showWarning(t('admin.backup.operations.verificationRunning'))
+      return
+    }
+    try {
+      const record = await adminAPI.backup.getBackup(backupId)
+      updateRecordInList(record)
+      if (record.verification_status === 'passed' || record.verification_status === 'failed') {
+        stopVerificationPolling()
+        verifyingId.value = ''
+        if (record.verification_status === 'passed') {
+          appStore.showSuccess(t('admin.backup.operations.verificationPassed'))
+          await loadPreflight()
+        } else {
+          appStore.showError(record.verification_error || t('admin.backup.operations.verificationFailed'))
+        }
+      }
+    } catch {
+      // 短暂网络错误不终止长时间恢复演练，下一轮继续查询。
+    }
+  }, 2000)
+}
+
+function stopVerificationPolling() {
+  if (verificationPollingTimer.value) {
+    clearInterval(verificationPollingTimer.value)
+    verificationPollingTimer.value = null
+  }
+}
+
 function handleVisibilityChange() {
   if (document.hidden) {
     stopPolling()
     stopRestorePolling()
+    stopVerificationPolling()
   } else {
     // 标签页恢复时刷新列表，检查是否仍有活跃操作
     loadBackups().then(() => {
@@ -633,6 +745,11 @@ function handleVisibilityChange() {
       if (restoring) {
         restoringId.value = restoring.id
         startRestorePolling(restoring.id)
+      }
+      const verifying = backups.value.find(r => r.verification_status === 'running')
+      if (verifying) {
+        verifyingId.value = verifying.id
+        startVerificationPolling(verifying.id)
       }
     })
   }
@@ -797,6 +914,19 @@ async function loadBackups() {
   }
 }
 
+async function loadPreflight() {
+  loadingPreflight.value = true
+  preflightError.value = ''
+  try {
+    preflight.value = await adminAPI.backup.getPreflight()
+  } catch (error) {
+    preflight.value = null
+    preflightError.value = (error as { message?: string })?.message || t('errors.networkError')
+  } finally {
+    loadingPreflight.value = false
+  }
+}
+
 async function createBackup() {
   creatingBackup.value = true
   try {
@@ -852,6 +982,11 @@ function closeDownloadParts() {
 }
 
 async function restoreBackup(id: string) {
+  const record = backups.value.find(item => item.id === id)
+  if (record?.verification_status !== 'passed') {
+    appStore.showWarning(t('admin.backup.actions.restoreRequiresVerification'))
+    return
+  }
   if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
   const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
   if (!password) return
@@ -870,6 +1005,21 @@ async function restoreBackup(id: string) {
     } else {
       appStore.showError(error?.message || t('errors.networkError'))
     }
+  }
+}
+
+async function verifyBackup(id: string) {
+  if (!window.confirm(t('admin.backup.actions.verifyConfirm'))) return
+  verifyingId.value = id
+  try {
+    const record = await backupStepUp.run(() => adminAPI.backup.verifyBackup(id))
+    updateRecordInList(record)
+    startVerificationPolling(id)
+  } catch (error) {
+    verifyingId.value = ''
+    if (isStepUpCancelled(error)) return
+    if (reportStepUpBlocked(error)) return
+    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
   }
 }
 
@@ -898,6 +1048,19 @@ function statusClass(status: string): string {
   }
 }
 
+function preflightCheckClass(status: string): string {
+  if (status === 'pass') return statusClass('completed')
+  if (status === 'fail') return statusClass('failed')
+  return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+}
+
+function verificationClass(status?: string): string {
+  if (status === 'passed') return statusClass('completed')
+  if (status === 'failed') return statusClass('failed')
+  if (status === 'running') return statusClass('running')
+  return statusClass('pending')
+}
+
 function formatSize(bytes: number): string {
   if (!bytes || bytes <= 0) return '-'
   if (bytes < 1024) return `${bytes} B`
@@ -914,7 +1077,7 @@ function formatDate(value?: string): string {
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  await Promise.all([loadS3Config(), loadImageStorageConfig(), loadSchedule(), loadBackups()])
+  await Promise.all([loadS3Config(), loadImageStorageConfig(), loadSchedule(), loadBackups(), loadPreflight()])
 
   // 如果有正在 running 的备份，恢复轮询
   const runningBackup = backups.value.find(r => r.status === 'running')
@@ -927,11 +1090,17 @@ onMounted(async () => {
     restoringId.value = restoringBackup.id
     startRestorePolling(restoringBackup.id)
   }
+  const verifyingBackup = backups.value.find(r => r.verification_status === 'running')
+  if (verifyingBackup) {
+    verifyingId.value = verifyingBackup.id
+    startVerificationPolling(verifyingBackup.id)
+  }
 })
 
 onBeforeUnmount(() => {
   stopPolling()
   stopRestorePolling()
+  stopVerificationPolling()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
