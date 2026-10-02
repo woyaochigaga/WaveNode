@@ -3,6 +3,7 @@ package dto
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -26,8 +27,14 @@ type CustomEndpoint struct {
 	Description string `json:"description"`
 }
 
-// SystemSettings represents the admin settings API response payload.
+// SystemSettings 表示管理端设置接口的响应内容。
 type SystemSettings struct {
+	// 配置版本用于乐观锁，并把网关请求关联到当时的运行时设置快照。
+	ConfigVersion     string     `json:"config_version,omitempty"`
+	ConfigUpdatedAt   time.Time  `json:"config_updated_at,omitempty"`
+	ConfigUpdatedBy   *int64     `json:"config_updated_by,omitempty"`
+	ConfigEffectiveAt *time.Time `json:"config_effective_at,omitempty"`
+
 	RegistrationEnabled                 bool                     `json:"registration_enabled"`
 	EmailVerifyEnabled                  bool                     `json:"email_verify_enabled"`
 	RegistrationEmailSuffixWhitelist    []string                 `json:"registration_email_suffix_whitelist"`

@@ -386,6 +386,9 @@ type UpdateSettingsRequest struct {
 	AuthSourceDingTalkPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_dingtalk_platform_quotas"`
 
 	AllowUserViewErrorRequests *bool `json:"allow_user_view_error_requests"`
+
+	// ConfigVersion 是 GET /admin/settings 返回的可选乐观锁版本；省略时兼容旧客户端行为。
+	ConfigVersion *string `json:"config_version,omitempty"`
 }
 
 // UpdateSettings 更新系统设置
@@ -2083,7 +2086,15 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		},
 		ForceEmailOnThirdPartySignup: boolValueOrDefault(req.ForceEmailOnThirdPartySignup, previousAuthSourceDefaults.ForceEmailOnThirdPartySignup),
 	}
-	if err := h.settingService.UpdateSettingsWithAuthSourceDefaultsOmitting(c.Request.Context(), settings, authSourceDefaults, omitted); err != nil {
+	var updatedBy *int64
+	if subject, ok := middleware.GetAuthSubjectFromContext(c); ok && subject.UserID > 0 {
+		updatedBy = &subject.UserID
+	}
+	expectedVersion := ""
+	if req.ConfigVersion != nil {
+		expectedVersion = strings.TrimSpace(*req.ConfigVersion)
+	}
+	if err := h.settingService.UpdateSettingsWithAuthSourceDefaultsVersioned(c.Request.Context(), settings, authSourceDefaults, omitted, expectedVersion, updatedBy); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -2136,6 +2147,13 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			h.paymentService.RefreshProviders(c.Request.Context())
 		}
 	}
+	// OpenAI fast 策略和支付配置使用独立设置服务写入，完成后把版本元数据对齐到最终内容。
+	if req.OpenAIFastPolicySettings != nil || (h.paymentConfigService != nil && hasPaymentFields(req)) {
+		if err := h.settingService.ReconcileRuntimeSettingsVersion(c.Request.Context(), updatedBy); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
 
 	h.auditSettingsUpdate(c, previousSettings, settings, previousAuthSourceDefaults, authSourceDefaults, auditReq)
 
@@ -2168,8 +2186,13 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		updatedPaymentCfg = &service.PaymentConfig{}
 	}
 	passkeyConfigured, passkeyRPID, passkeyRPOrigins := h.settingService.PasskeyConfiguration()
+	configVersion := h.settingService.RuntimeSettingsVersion(c.Request.Context())
 
 	payload := dto.SystemSettings{
+		ConfigVersion:                                          configVersion.Version,
+		ConfigUpdatedAt:                                        configVersion.UpdatedAt,
+		ConfigUpdatedBy:                                        configVersion.UpdatedBy,
+		ConfigEffectiveAt:                                      configVersion.EffectiveAt,
 		RegistrationEnabled:                                    updatedSettings.RegistrationEnabled,
 		EmailVerifyEnabled:                                     updatedSettings.EmailVerifyEnabled,
 		RegistrationEmailSuffixWhitelist:                       updatedSettings.RegistrationEmailSuffixWhitelist,

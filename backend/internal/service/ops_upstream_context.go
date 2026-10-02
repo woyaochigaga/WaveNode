@@ -388,6 +388,10 @@ type OpsUpstreamErrorEvent struct {
 	Platform    string `json:"platform,omitempty"`
 	AccountID   int64  `json:"account_id,omitempty"`
 	AccountName string `json:"account_name,omitempty"`
+	// ConfigVersion 和 PriceVersion 只保存请求使用的内容指纹，
+	// 不暴露设置值、价格内容或凭据。
+	ConfigVersion string `json:"config_version,omitempty"`
+	PriceVersion  string `json:"price_version,omitempty"`
 
 	// Proxy attribution is an immutable, credential-free snapshot of the route
 	// used by this attempt. ProxyID is null for direct and unknown routes;
@@ -445,6 +449,21 @@ func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 		ev.AtUnixMs = time.Now().UnixMilli()
 	}
 	ev.Platform = strings.TrimSpace(ev.Platform)
+	// 部分内部调用只提供 Gin 上下文而没有 HTTP Request；版本元数据应当可选，
+	// 不能因为缺少请求对象影响原有错误处理流程。
+	if c.Request != nil {
+		requestContext := c.Request.Context()
+		if ev.ConfigVersion == "" {
+			if version, _ := requestContext.Value(ctxkey.RuntimeConfigVersion).(string); strings.TrimSpace(version) != "" {
+				ev.ConfigVersion = strings.TrimSpace(version)
+			}
+		}
+		if ev.PriceVersion == "" {
+			if version, _ := requestContext.Value(ctxkey.RuntimePriceVersion).(string); strings.TrimSpace(version) != "" {
+				ev.PriceVersion = strings.TrimSpace(version)
+			}
+		}
+	}
 	normalizeOpsUpstreamProxyAttribution(&ev)
 	ev.UpstreamRequestID = strings.TrimSpace(ev.UpstreamRequestID)
 	ev.UpstreamResponseBody = strings.TrimSpace(ev.UpstreamResponseBody)

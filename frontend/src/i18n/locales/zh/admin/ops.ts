@@ -402,7 +402,40 @@ export default {
         suggestPlatform: '🚨 平台错误，建议立即排查修复',
         suggestGeneric: '查看详情了解更多信息',
         apiKeyPrefix: 'Key 前缀',
-        keyDeletedBadge: 'Key 已删除'
+        keyDeletedBadge: 'Key 已删除',
+        routeTrace: {
+          title: '路由与计费追踪',
+          description: '仅展示脱敏决策元数据，不包含 Prompt、凭据或完整响应。',
+          loading: '正在读取该请求的路由轨迹…',
+          retry: '重新加载',
+          failed: '路由追踪加载失败',
+          forbidden: '当前账号无权查看路由追踪',
+          notFound: '该请求没有可用的路由追踪记录',
+          errorHint: '可稍后重试；旧请求或已过保留期的记录可能无法恢复。',
+          unavailable: '缺少请求 ID，无法查询路由追踪。',
+          attempted: '已尝试候选',
+          retries: '重试次数',
+          billing: '计费结果',
+          retryable: '客户端可重试',
+          records: '条用量记录',
+          modelRoute: '模型映射',
+          endpointRoute: '端点路径',
+          configVersion: '配置版本',
+          priceVersion: '价格版本',
+          finalError: '最终错误',
+          finalAccount: '最终账号（匿名）',
+          timeline: '上游尝试时间线',
+          noAttempts: '没有保存到上游尝试，错误可能发生在路由或计费之前。',
+          reasonUnavailable: '未记录切换原因',
+          billingStatus: {
+            charged: '已产生费用',
+            recorded_zero_cost: '已记录，费用为 0',
+            not_charged: '未产生费用',
+            billing_blocked: '计费前已阻止',
+            lookup_failed: '计费状态查询失败',
+            unknown: '暂无法确认'
+          }
+        }
       },
       requestDetails: {
         title: '请求明细',

@@ -16,10 +16,16 @@ func ToHTTP(err error) (statusCode int, body Status) {
 		return http.StatusOK, Status{Code: int32(http.StatusOK)}
 	}
 
+	retryable := defaultRetryableHTTPStatus(int(appErr.Code))
+	if appErr.RetryPolicySet {
+		retryable = appErr.Retryable
+	}
 	body = Status{
-		Code:    appErr.Code,
-		Reason:  appErr.Reason,
-		Message: appErr.Message,
+		Code:              appErr.Code,
+		Reason:            appErr.Reason,
+		Message:           appErr.Message,
+		Retryable:         retryable,
+		RetryAfterSeconds: appErr.RetryAfterSeconds,
 	}
 	if appErr.Metadata != nil {
 		body.Metadata = make(map[string]string, len(appErr.Metadata))
@@ -28,4 +34,14 @@ func ToHTTP(err error) (statusCode int, body Status) {
 		}
 	}
 	return int(appErr.Code), body
+}
+
+// defaultRetryableHTTPStatus 为尚未声明重试策略的旧错误提供保守默认值。
+func defaultRetryableHTTPStatus(status int) bool {
+	switch status {
+	case 408, 425, 429, 500, 502, 503, 504:
+		return true
+	default:
+		return false
+	}
 }

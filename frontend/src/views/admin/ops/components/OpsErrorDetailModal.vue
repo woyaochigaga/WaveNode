@@ -125,6 +125,124 @@
 
       </div>
 
+      <!-- 路由追踪只展示脱敏决策元数据，不渲染原始请求或上游响应。 -->
+      <section class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-700" data-testid="route-trace">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 dark:border-dark-700 dark:bg-dark-900">
+          <div>
+            <h3 class="text-sm font-black text-gray-900 dark:text-white">{{ t('admin.ops.errorDetail.routeTrace.title') }}</h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.description') }}</p>
+          </div>
+          <button
+            v-if="routeTraceError"
+            type="button"
+            class="btn btn-secondary btn-sm"
+            :disabled="routeTraceLoading || !requestId"
+            @click="fetchRouteTrace(requestId)"
+          >
+            {{ t('admin.ops.errorDetail.routeTrace.retry') }}
+          </button>
+        </div>
+
+        <div v-if="routeTraceLoading" class="flex items-center gap-3 px-5 py-8 text-sm text-gray-500 dark:text-gray-400">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-b-primary-600 dark:border-dark-600"></div>
+          {{ t('admin.ops.errorDetail.routeTrace.loading') }}
+        </div>
+
+        <div v-else-if="routeTraceError" class="px-5 py-7">
+          <div class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ routeTraceErrorLabel }}</div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.errorHint') }}</div>
+        </div>
+
+        <div v-else-if="routeTrace" class="bg-white dark:bg-dark-800">
+          <dl class="grid grid-cols-2 divide-x divide-y divide-gray-200 border-b border-gray-200 dark:divide-dark-700 dark:border-dark-700 md:grid-cols-4">
+            <div class="px-5 py-4">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.attempted') }}</dt>
+              <dd class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ routeTrace.candidate_count }}</dd>
+            </div>
+            <div class="px-5 py-4">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.retries') }}</dt>
+              <dd class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ routeTrace.retry_count }}</dd>
+            </div>
+            <div class="px-5 py-4">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.billing') }}</dt>
+              <dd class="mt-1 text-sm font-bold text-gray-900 dark:text-white">{{ billingStatusLabel(routeTrace.billing_status) }}</dd>
+              <div v-if="routeTrace.usage_record_count > 0" class="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+                {{ formatBilledAmount(routeTrace.billed_amount) }} / {{ routeTrace.usage_record_count }} {{ t('admin.ops.errorDetail.routeTrace.records') }}
+              </div>
+            </div>
+            <div class="px-5 py-4">
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.retryable') }}</dt>
+              <dd class="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+                {{ routeTrace.retryable ? t('common.yes') : t('common.no') }}
+                <span v-if="routeTrace.retry_after" class="ml-1 text-xs font-normal text-gray-500">({{ routeTrace.retry_after }}s)</span>
+              </dd>
+            </div>
+          </dl>
+
+          <dl class="grid gap-x-8 gap-y-4 px-5 py-5 text-sm md:grid-cols-2">
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.modelRoute') }}</dt>
+              <dd class="mt-1 break-all font-mono text-gray-900 dark:text-white">
+                {{ routeTrace.requested_model || '—' }}
+                <span v-if="routeTrace.final_model && routeTrace.final_model !== routeTrace.requested_model" class="text-gray-400"> → </span>
+                <span v-if="routeTrace.final_model && routeTrace.final_model !== routeTrace.requested_model" class="text-primary-600 dark:text-primary-400">{{ routeTrace.final_model }}</span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.endpointRoute') }}</dt>
+              <dd class="mt-1 break-all font-mono text-gray-900 dark:text-white">
+                {{ routeTrace.inbound_endpoint || '—' }}
+                <span v-if="routeTrace.upstream_endpoint" class="text-gray-400"> → </span>
+                <span v-if="routeTrace.upstream_endpoint" class="text-primary-600 dark:text-primary-400">{{ routeTrace.upstream_endpoint }}</span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.configVersion') }}</dt>
+              <dd class="mt-1 font-mono text-gray-900 dark:text-white">{{ routeTrace.config_version || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.priceVersion') }}</dt>
+              <dd class="mt-1 font-mono text-gray-900 dark:text-white">{{ routeTrace.price_version || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.finalError') }}</dt>
+              <dd class="mt-1 text-gray-900 dark:text-white">
+                <span class="font-mono font-bold">{{ routeTrace.final_error_code || '—' }}</span>
+                <span v-if="routeTrace.final_error_message" class="ml-2 text-gray-500 dark:text-gray-400">{{ routeTrace.final_error_message }}</span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.finalAccount') }}</dt>
+              <dd class="mt-1 font-mono text-gray-900 dark:text-white">{{ routeTrace.final_account_ref || '—' }}</dd>
+            </div>
+          </dl>
+
+          <div class="border-t border-gray-200 px-5 py-5 dark:border-dark-700">
+            <div class="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">{{ t('admin.ops.errorDetail.routeTrace.timeline') }}</div>
+            <div v-if="routeTrace.attempts.length === 0" class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.ops.errorDetail.routeTrace.noAttempts') }}
+            </div>
+            <ol v-else class="mt-4 space-y-0 border-l border-gray-200 pl-5 dark:border-dark-600">
+              <li v-for="(attempt, index) in routeTrace.attempts" :key="`${attempt.at_unix_ms || 0}-${index}`" class="relative pb-5 last:pb-0">
+                <span class="absolute -left-[23px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-primary-500 dark:border-dark-800"></span>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span class="font-bold text-gray-900 dark:text-white">#{{ index + 1 }} {{ attempt.account_ref || '—' }}</span>
+                  <span class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ attempt.platform || 'unknown' }}</span>
+                  <span class="font-mono text-xs text-gray-500 dark:text-gray-400">HTTP {{ attempt.status_code || '—' }}</span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ [attempt.stage, attempt.kind, attempt.reason].filter(Boolean).join(' / ') || t('admin.ops.errorDetail.routeTrace.reasonUnavailable') }}
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <div v-else class="px-5 py-7 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('admin.ops.errorDetail.routeTrace.unavailable') }}
+        </div>
+      </section>
+
       <div v-if="rootCauseMessage" class="rounded-xl bg-amber-50 p-6 dark:bg-amber-900/10">
         <h3 class="text-sm font-black uppercase tracking-wider text-amber-900 dark:text-amber-200">{{ t('admin.ops.errorDetail.rootCause') }}</h3>
         <div class="mt-3 break-words text-sm font-medium text-amber-900 dark:text-amber-100">{{ rootCauseMessage }}</div>
@@ -230,7 +348,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAppStore } from '@/stores'
-import { opsAPI, type OpsErrorDetail } from '@/api/admin/ops'
+import { opsAPI, type OpsErrorDetail, type OpsRouteTrace } from '@/api/admin/ops'
 import { formatDateTime } from '@/utils/format'
 import { resolveUpstreamPayload } from '../utils/errorDetailResponse'
 
@@ -254,10 +372,51 @@ const appStore = useAppStore()
 
 const loading = ref(false)
 const detail = ref<OpsErrorDetail | null>(null)
+const routeTrace = ref<OpsRouteTrace | null>(null)
+const routeTraceLoading = ref(false)
+const routeTraceError = ref<'not_found' | 'forbidden' | 'failed' | ''>('')
+let routeTraceRequestSequence = 0
 
 const showUpstreamList = computed(() => props.errorType === 'request')
 
 const requestId = computed(() => detail.value?.request_id || detail.value?.client_request_id || '')
+
+const routeTraceErrorLabel = computed(() => {
+  if (routeTraceError.value === 'forbidden') return t('admin.ops.errorDetail.routeTrace.forbidden')
+  if (routeTraceError.value === 'not_found') return t('admin.ops.errorDetail.routeTrace.notFound')
+  return t('admin.ops.errorDetail.routeTrace.failed')
+})
+
+function billingStatusLabel(status: string): string {
+  const supported = new Set(['charged', 'recorded_zero_cost', 'not_charged', 'billing_blocked', 'lookup_failed', 'unknown'])
+  const key = supported.has(status) ? status : 'unknown'
+  return t(`admin.ops.errorDetail.routeTrace.billingStatus.${key}`)
+}
+
+function formatBilledAmount(amount: number): string {
+  return `$${Number(amount || 0).toFixed(6)}`
+}
+
+async function fetchRouteTrace(id: string) {
+  const normalized = id.trim()
+  const requestSequence = ++routeTraceRequestSequence
+  routeTrace.value = null
+  routeTraceError.value = ''
+  if (!normalized) return
+  routeTraceLoading.value = true
+  try {
+    const result = await opsAPI.getRouteTrace(normalized)
+    if (requestSequence !== routeTraceRequestSequence) return
+    routeTrace.value = result
+  } catch (error: any) {
+    if (requestSequence !== routeTraceRequestSequence) return
+    if (error?.status === 403) routeTraceError.value = 'forbidden'
+    else if (error?.status === 404) routeTraceError.value = 'not_found'
+    else routeTraceError.value = 'failed'
+  } finally {
+    if (requestSequence === routeTraceRequestSequence) routeTraceLoading.value = false
+  }
+}
 
 type DiagnosticPayloadKey = 'client' | 'upstream_message' | 'upstream_detail' | 'upstream_events'
 
@@ -395,6 +554,8 @@ async function fetchDetail(id: number) {
     const kind = props.errorType || (detail.value?.phase === 'upstream' ? 'upstream' : 'request')
     const d = kind === 'upstream' ? await opsAPI.getUpstreamErrorDetail(id) : await opsAPI.getRequestErrorDetail(id)
     detail.value = d
+    // 路由追踪是辅助诊断信息，不阻塞错误详情主体展示。
+    void fetchRouteTrace(d.request_id || d.client_request_id || '')
   } catch (err: any) {
     detail.value = null
     appStore.showError(err?.message || t('admin.ops.failedToLoadErrorDetail'))
@@ -407,7 +568,11 @@ watch(
   () => [props.show, props.errorId] as const,
   ([show, id]) => {
     if (!show) {
+      routeTraceRequestSequence += 1
       detail.value = null
+      routeTrace.value = null
+      routeTraceError.value = ''
+      routeTraceLoading.value = false
       return
     }
     if (typeof id === 'number' && id > 0) {

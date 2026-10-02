@@ -72,6 +72,66 @@ func NewOpsHandler(opsService *service.OpsService) *OpsHandler {
 	return &OpsHandler{opsService: opsService}
 }
 
+// GetRouteTrace 返回仅管理员可见的脱敏路由说明。
+// 它复用已有 Ops 事件，不另存请求正文，也不会用当前版本冒充旧请求的历史版本。
+// GET /api/v1/admin/ops/requests/:request_id/route-trace
+func (h *OpsHandler) GetRouteTrace(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	if err := h.opsService.RequireMonitoringEnabled(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	requestID := strings.TrimSpace(c.Param("request_id"))
+	if requestID == "" || len(requestID) > 128 {
+		response.BadRequest(c, "Invalid request_id")
+		return
+	}
+	now := time.Now()
+	filter := &service.OpsErrorLogFilter{
+		RequestID: requestID,
+		StartTime: ptrTime(now.Add(-30 * 24 * time.Hour)),
+		EndTime:   ptrTime(now.Add(time.Minute)),
+		Page:      1,
+		PageSize:  20,
+		View:      "all",
+	}
+	list, err := h.opsService.GetErrorLogs(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if len(list.Errors) == 0 {
+		filter.RequestID = ""
+		filter.ClientRequestID = requestID
+		list, err = h.opsService.GetErrorLogs(c.Request.Context(), filter)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
+	if len(list.Errors) == 0 {
+		response.ErrorFrom(c, service.ErrRouteTraceNotFound)
+		return
+	}
+	detail, err := h.opsService.GetErrorLogByID(c.Request.Context(), list.Errors[0].ID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	trace, err := service.BuildRouteTrace(detail)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	h.opsService.EnrichRouteTraceBilling(c.Request.Context(), trace)
+	response.Success(c, trace)
+}
+
+func ptrTime(value time.Time) *time.Time { return &value }
+
 // GetErrorLogs lists ops error logs.
 // applyOpsErrorSortParams reads sort_by/sort_order query params into the filter.
 // Column whitelist and order normalization live in the repository; unknown

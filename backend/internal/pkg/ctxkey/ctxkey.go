@@ -26,6 +26,12 @@ const (
 	// ClientRequestID 客户端请求的唯一标识，用于追踪请求全生命周期（用于 Ops 监控与排障）。
 	ClientRequestID Key = "ctx_client_request_id"
 
+	// RuntimeConfigVersion 是请求实际观察到的动态设置版本，只允许进入脱敏运维元数据。
+	RuntimeConfigVersion Key = "ctx_runtime_config_version"
+
+	// RuntimePriceVersion 是请求使用的价格目录指纹，只记录哈希，不记录价格内容。
+	RuntimePriceVersion Key = "ctx_runtime_price_version"
+
 	// Model 请求模型标识（用于统一请求链路日志字段）。
 	Model Key = "ctx_model"
 

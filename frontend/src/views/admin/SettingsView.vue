@@ -9139,6 +9139,8 @@ const { copyToClipboard } = useClipboard();
 const loading = ref(true);
 const loadFailed = ref(false);
 const saving = ref(false);
+// 保存时回传页面加载到的版本，后端用它阻止并发覆盖。
+const loadedConfigVersion = ref("");
 const testingSmtp = ref(false);
 const sendingTestEmail = ref(false);
 const smtpPasswordManuallyEdited = ref(false);
@@ -10991,10 +10993,12 @@ async function loadSettings() {
   loadFailed.value = false;
   try {
     const settings = await adminAPI.settings.getSettings();
+    loadedConfigVersion.value = settings.config_version || "";
     settings.payment_load_balance_strategy =
       settings.payment_load_balance_strategy || "round-robin";
     // Only assign non-null values from backend (null means unconfigured, keep defaults)
     for (const [key, value] of Object.entries(settings)) {
+      if (key.startsWith("config_")) continue;
       if (value !== null && value !== undefined) {
         (form as Record<string, unknown>)[key] = value;
       }
@@ -11413,6 +11417,7 @@ async function saveSettings() {
     }
 
     const payload: UpdateSettingsRequest = {
+      config_version: loadedConfigVersion.value || undefined,
       registration_enabled: form.registration_enabled,
       email_verify_enabled: form.email_verify_enabled,
       registration_email_suffix_whitelist:
@@ -11776,7 +11781,9 @@ async function saveSettings() {
     const updated = await settingsStepUp.run(() =>
       adminAPI.settings.updateSettings(payload),
     );
+    loadedConfigVersion.value = updated.config_version || loadedConfigVersion.value;
     for (const [key, value] of Object.entries(updated)) {
+      if (key.startsWith("config_")) continue;
       if (key === "openai_fast_policy_settings") continue;
       if (value !== null && value !== undefined) {
         (form as Record<string, unknown>)[key] = value;
@@ -11869,6 +11876,19 @@ async function saveSettings() {
         stepUpBlockReason(error) === "STEP_UP_ADMIN_API_KEY_FORBIDDEN"
           ? t("stepUp.adminApiKeyForbidden")
           : t("stepUp.notEnabled"),
+      );
+      return;
+    }
+    if (
+      (error as { reason?: string })?.reason ===
+      "RUNTIME_SETTINGS_VERSION_CONFLICT"
+    ) {
+      await loadSettings();
+      appStore.showError(
+        localText(
+          "配置已被其他管理员更新，页面已刷新，请确认后重新保存。",
+          "Settings changed in another admin session. The page was refreshed; review and save again.",
+        ),
       );
       return;
     }

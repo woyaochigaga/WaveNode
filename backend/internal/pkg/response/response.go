@@ -5,7 +5,9 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"strconv"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"github.com/gin-gonic/gin"
@@ -13,11 +15,13 @@ import (
 
 // Response 标准API响应格式
 type Response struct {
-	Code     int               `json:"code"`
-	Message  string            `json:"message"`
-	Reason   string            `json:"reason,omitempty"`
-	Metadata map[string]string `json:"metadata,omitempty"`
-	Data     any               `json:"data,omitempty"`
+	Code              int               `json:"code"`
+	Message           string            `json:"message"`
+	Reason            string            `json:"reason,omitempty"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
+	Retryable         bool              `json:"retryable,omitempty"`
+	RetryAfterSeconds int               `json:"retry_after,omitempty"`
+	Data              any               `json:"data,omitempty"`
 }
 
 // PaginatedData 分页数据格式（匹配前端期望）
@@ -60,7 +64,7 @@ func Accepted(c *gin.Context, data any) {
 func Error(c *gin.Context, statusCode int, message string) {
 	c.JSON(statusCode, Response{
 		Code:     statusCode,
-		Message:  message,
+		Message:  logredact.RedactText(message),
 		Reason:   "",
 		Metadata: nil,
 	})
@@ -71,10 +75,23 @@ func Error(c *gin.Context, statusCode int, message string) {
 func ErrorWithDetails(c *gin.Context, statusCode int, message, reason string, metadata map[string]string) {
 	c.JSON(statusCode, Response{
 		Code:     statusCode,
-		Message:  message,
-		Reason:   reason,
-		Metadata: metadata,
+		Message:  logredact.RedactText(message),
+		Reason:   logredact.RedactText(reason),
+		Metadata: redactErrorMetadata(metadata),
 	})
+}
+
+// redactErrorMetadata 保留既有 string map 契约，同时在统一响应出口遮住敏感键和值。
+func redactErrorMetadata(metadata map[string]string) map[string]string {
+	if metadata == nil {
+		return nil
+	}
+	redacted := logredact.RedactValue(metadata)
+	result, ok := redacted.(map[string]string)
+	if !ok {
+		return map[string]string{}
+	}
+	return result
 }
 
 // ErrorFrom converts an ApplicationError (or any error) into the envelope-compatible error response.
@@ -85,14 +102,44 @@ func ErrorFrom(c *gin.Context, err error) bool {
 	}
 
 	statusCode, status := infraerrors.ToHTTP(err)
+	metadata := cloneMetadata(status.Metadata)
+	if c != nil && c.Request != nil {
+		if requestID, _ := c.Request.Context().Value(ctxkey.ClientRequestID).(string); requestID != "" {
+			if metadata == nil {
+				metadata = make(map[string]string, 1)
+			}
+			metadata["request_id"] = requestID
+		}
+	}
 
 	// Log internal errors with full details for debugging
 	if statusCode >= 500 && c.Request != nil {
 		log.Printf("[ERROR] %s %s\n  Error: %s", c.Request.Method, c.Request.URL.Path, logredact.RedactText(err.Error()))
 	}
+	if status.RetryAfterSeconds > 0 {
+		c.Header("Retry-After", strconv.Itoa(status.RetryAfterSeconds))
+	}
 
-	ErrorWithDetails(c, statusCode, status.Message, status.Reason, status.Metadata)
+	c.JSON(statusCode, Response{
+		Code:              statusCode,
+		Message:           logredact.RedactText(status.Message),
+		Reason:            logredact.RedactText(status.Reason),
+		Metadata:          redactErrorMetadata(metadata),
+		Retryable:         status.Retryable,
+		RetryAfterSeconds: status.RetryAfterSeconds,
+	})
 	return true
+}
+
+func cloneMetadata(metadata map[string]string) map[string]string {
+	if metadata == nil {
+		return nil
+	}
+	cloned := make(map[string]string, len(metadata))
+	for key, value := range metadata {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 // BadRequest 返回400错误

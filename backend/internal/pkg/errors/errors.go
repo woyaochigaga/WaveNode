@@ -13,10 +13,13 @@ const (
 )
 
 type Status struct {
-	Code     int32             `json:"code"`
-	Reason   string            `json:"reason,omitempty"`
-	Message  string            `json:"message"`
-	Metadata map[string]string `json:"metadata,omitempty"`
+	Code              int32             `json:"code"`
+	Reason            string            `json:"reason,omitempty"`
+	Message           string            `json:"message"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
+	Retryable         bool              `json:"retryable,omitempty"`
+	RetryAfterSeconds int               `json:"retry_after,omitempty"`
+	RetryPolicySet    bool              `json:"-"`
 }
 
 // ApplicationError is the standard error type used to control HTTP responses.
@@ -68,6 +71,17 @@ func (e *ApplicationError) WithMetadata(md map[string]string) *ApplicationError 
 	err.Metadata = make(map[string]string, len(md))
 	for k, v := range md {
 		err.Metadata[k] = v
+	}
+	return err
+}
+
+// WithRetryPolicy 添加安全的重试建议，不改变网关已选择的对外协议格式。
+func (e *ApplicationError) WithRetryPolicy(retryable bool, retryAfterSeconds int) *ApplicationError {
+	err := Clone(e)
+	err.Retryable = retryable
+	err.RetryPolicySet = true
+	if retryAfterSeconds > 0 {
+		err.RetryAfterSeconds = retryAfterSeconds
 	}
 	return err
 }
@@ -135,10 +149,13 @@ func Clone(err *ApplicationError) *ApplicationError {
 	return &ApplicationError{
 		cause: err.cause,
 		Status: Status{
-			Code:     err.Code,
-			Reason:   err.Reason,
-			Message:  err.Message,
-			Metadata: metadata,
+			Code:              err.Code,
+			Reason:            err.Reason,
+			Message:           err.Message,
+			Metadata:          metadata,
+			Retryable:         err.Retryable,
+			RetryAfterSeconds: err.RetryAfterSeconds,
+			RetryPolicySet:    err.RetryPolicySet,
 		},
 	}
 }

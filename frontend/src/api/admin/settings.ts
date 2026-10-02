@@ -398,6 +398,11 @@ export function deriveWeChatConnectStoredMode(
  * System settings interface
  */
 export interface SystemSettings {
+  // 只读配置版本，用于保存时检测其他管理员的并发修改。
+  config_version?: string;
+  config_updated_at?: string;
+  config_updated_by?: number;
+  config_effective_at?: string;
   // Registration settings
   registration_enabled: boolean;
   email_verify_enabled: boolean;
@@ -753,6 +758,8 @@ export interface SystemSettings {
 }
 
 export interface UpdateSettingsRequest {
+  // 页面加载时拿到的版本号；后端发现版本不一致时拒绝覆盖。
+  config_version?: string;
   registration_enabled?: boolean;
   email_verify_enabled?: boolean;
   registration_email_suffix_whitelist?: string[];

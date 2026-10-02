@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"golang.org/x/sync/singleflight"
-	"sync"
 )
 
 const (
@@ -152,6 +152,12 @@ type SettingService struct {
 	openAIQuotaAutoPauseSettingsCache atomic.Value // *cachedOpenAIQuotaAutoPauseSettings
 	openAIQuotaAutoPauseSettingsSF    singleflight.Group
 	openAIAPIKeyHealthBreakerCache    atomic.Value // *cachedOpenAIAPIKeyHealthBreakerSettings
+
+	// settingsVersionCache is a short-lived snapshot used by gateway requests.
+	// The TTL gives other instances a bounded convergence window when a Redis
+	// invalidation notification is missed.
+	settingsVersionCache atomic.Value // *runtimeSettingsVersionSnapshot
+	settingsVersionSF    singleflight.Group
 
 	channelMonitorRuntimeListenersMu sync.Mutex
 	channelMonitorRuntimeListeners   []func()
@@ -362,6 +368,7 @@ func (s *SettingService) LoadForwardedClientIPSettings(ctx context.Context) erro
 			s.cfg.SetForwardedClientIPSettings(enabled, headers)
 			return errors.Join(headersErr, fmt.Errorf("migrate forwarded client ip setting: %w", err))
 		}
+		s.invalidateRuntimeSettingsVersion()
 	}
 
 	s.cfg.SetForwardedClientIPSettings(enabled, headers)

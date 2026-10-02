@@ -402,7 +402,40 @@ export default {
         suggestPlatform: 'Platform error: prioritize investigation and fix',
         suggestGeneric: 'See details for more context',
         apiKeyPrefix: 'Key Prefix',
-        keyDeletedBadge: 'Key Deleted'
+        keyDeletedBadge: 'Key Deleted',
+        routeTrace: {
+          title: 'Route and Billing Trace',
+          description: 'Redacted decision metadata only. Prompts, credentials, and full responses are excluded.',
+          loading: 'Loading the request route trace…',
+          retry: 'Reload',
+          failed: 'Failed to load route trace',
+          forbidden: 'You do not have permission to view route traces',
+          notFound: 'No route trace is available for this request',
+          errorHint: 'Retry later. Older or expired records may no longer be available.',
+          unavailable: 'A request ID is required to load the route trace.',
+          attempted: 'Candidates Tried',
+          retries: 'Retries',
+          billing: 'Billing Result',
+          retryable: 'Client Retryable',
+          records: 'usage records',
+          modelRoute: 'Model Mapping',
+          endpointRoute: 'Endpoint Route',
+          configVersion: 'Config Version',
+          priceVersion: 'Price Version',
+          finalError: 'Final Error',
+          finalAccount: 'Final Account (Anonymous)',
+          timeline: 'Upstream Attempt Timeline',
+          noAttempts: 'No upstream attempt was stored. The failure may have occurred before routing or billing.',
+          reasonUnavailable: 'No switch reason recorded',
+          billingStatus: {
+            charged: 'Charged',
+            recorded_zero_cost: 'Recorded at zero cost',
+            not_charged: 'Not charged',
+            billing_blocked: 'Blocked before billing',
+            lookup_failed: 'Billing lookup failed',
+            unknown: 'Unknown'
+          }
+        }
       },
       requestDetails: {
         title: 'Request Details',

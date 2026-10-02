@@ -47,6 +47,7 @@ func (s *SettingService) UpdateSettingsOmitting(ctx context.Context, settings *S
 	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
 		return err
 	}
+	s.invalidateRuntimeSettingsVersion()
 	s.refreshCachedSettingsAfterWrite(ctx, settings, omitted)
 	return nil
 }
@@ -60,6 +61,12 @@ func (s *SettingService) UpdateSettingsWithAuthSourceDefaults(ctx context.Contex
 // auth-source defaults in a single write, leaving the keys in omitted at their
 // stored value.
 func (s *SettingService) UpdateSettingsWithAuthSourceDefaultsOmitting(ctx context.Context, settings *SystemSettings, authDefaults *AuthSourceDefaultSettings, omitted OmittedSettingKeys) error {
+	return s.UpdateSettingsWithAuthSourceDefaultsVersioned(ctx, settings, authDefaults, omitted, "", nil)
+}
+
+// UpdateSettingsWithAuthSourceDefaultsVersioned updates settings with an
+// optional optimistic version check and actor snapshot for the admin panel.
+func (s *SettingService) UpdateSettingsWithAuthSourceDefaultsVersioned(ctx context.Context, settings *SystemSettings, authDefaults *AuthSourceDefaultSettings, omitted OmittedSettingKeys, expectedVersion string, updatedBy *int64) error {
 	updates, err := s.buildSystemSettingsUpdates(ctx, settings)
 	if err != nil {
 		return err
@@ -74,7 +81,7 @@ func (s *SettingService) UpdateSettingsWithAuthSourceDefaultsOmitting(ctx contex
 	}
 	omitted.dropFrom(updates)
 
-	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
+	if err := s.persistSettingsVersioned(ctx, updates, expectedVersion, updatedBy); err != nil {
 		return err
 	}
 	s.refreshCachedSettingsAfterWrite(ctx, settings, omitted)

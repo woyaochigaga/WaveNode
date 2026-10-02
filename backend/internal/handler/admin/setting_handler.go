@@ -131,8 +131,13 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		paymentCfg = &service.PaymentConfig{}
 	}
 	passkeyConfigured, passkeyRPID, passkeyRPOrigins := h.settingService.PasskeyConfiguration()
+	configVersion := h.settingService.RuntimeSettingsVersion(c.Request.Context())
 
 	payload := dto.SystemSettings{
+		ConfigVersion:                                          configVersion.Version,
+		ConfigUpdatedAt:                                        configVersion.UpdatedAt,
+		ConfigUpdatedBy:                                        configVersion.UpdatedBy,
+		ConfigEffectiveAt:                                      configVersion.EffectiveAt,
 		RegistrationEnabled:                                    settings.RegistrationEnabled,
 		EmailVerifyEnabled:                                     settings.EmailVerifyEnabled,
 		RegistrationEmailSuffixWhitelist:                       settings.RegistrationEmailSuffixWhitelist,

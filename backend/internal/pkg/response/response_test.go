@@ -3,12 +3,14 @@
 package response
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	errors2 "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -180,8 +182,9 @@ func TestErrorFrom(t *testing.T) {
 			wantWritten:  true,
 			wantHTTPCode: http.StatusInternalServerError,
 			wantBody: Response{
-				Code:    http.StatusInternalServerError,
-				Message: errors2.UnknownMessage,
+				Code:      http.StatusInternalServerError,
+				Message:   errors2.UnknownMessage,
+				Retryable: true,
 			},
 		},
 	}
@@ -206,6 +209,47 @@ func TestErrorFrom(t *testing.T) {
 			require.Equal(t, tt.wantBody, got)
 		})
 	}
+}
+
+func TestErrorFromIncludesRequestIDAndRetryAdvice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	request := httptest.NewRequest(http.MethodGet, "/admin/example", nil)
+	request = request.WithContext(context.WithValue(request.Context(), ctxkey.ClientRequestID, "request-safe-123"))
+	c.Request = request
+
+	ErrorFrom(c, errors2.TooManyRequests("RATE_LIMITED", "slow down").WithRetryPolicy(true, 7))
+
+	got := parseResponseBody(t, w)
+	require.True(t, got.Retryable)
+	require.Equal(t, 7, got.RetryAfterSeconds)
+	require.Equal(t, "request-safe-123", got.Metadata["request_id"])
+	require.Equal(t, "7", w.Header().Get("Retry-After"))
+}
+
+func TestSensitiveLeakageCanaryIsRedactedFromErrorResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const canary = "sub2api-canary-secret-response"
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	ErrorWithDetails(
+		c,
+		http.StatusBadGateway,
+		"upstream rejected Authorization: Bearer "+canary,
+		"UPSTREAM_ERROR",
+		map[string]string{
+			"refresh_token": canary,
+			"proxy":         "http://worker:" + canary + "@127.0.0.1:8080",
+		},
+	)
+
+	require.Equal(t, http.StatusBadGateway, w.Code)
+	require.NotContains(t, w.Body.String(), canary)
+	response := parseResponseBody(t, w)
+	require.Equal(t, "***", response.Metadata["refresh_token"])
+	require.Contains(t, response.Metadata["proxy"], "worker:***@")
 }
 
 // ---------- 新增测试 ----------

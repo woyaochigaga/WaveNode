@@ -162,6 +162,42 @@ export interface OpsRequestDetailsParams {
 
 export type OpsRequestDetailsResponse = PaginatedResponse<OpsRequestDetail>
 
+export interface OpsRouteTraceAttempt {
+  at_unix_ms?: number
+  account_ref?: string
+  platform?: string
+  status_code?: number
+  kind?: string
+  stage?: string
+  scope?: string
+  reason?: string
+  config_version?: string
+  price_version?: string
+}
+
+export interface OpsRouteTrace {
+  request_id: string
+  client_request_id?: string
+  requested_model?: string
+  final_model?: string
+  inbound_endpoint?: string
+  upstream_endpoint?: string
+  config_version?: string
+  price_version: string
+  candidate_count: number
+  retry_count: number
+  downgrade_reason?: string
+  final_account_ref?: string
+  final_error_code?: string
+  final_error_message?: string
+  retryable: boolean
+  retry_after?: number
+  billing_status: string
+  billed_amount: number
+  usage_record_count: number
+  attempts: OpsRouteTraceAttempt[]
+}
+
 export interface OpsLatencyHistogramBucket {
   range: string
   count: number
@@ -1175,6 +1211,13 @@ export async function listRequestDetails(params: OpsRequestDetailsParams): Promi
   return data
 }
 
+/** 获取单次失败请求的脱敏路由决策和计费摘要。 */
+export async function getRouteTrace(requestId: string): Promise<OpsRouteTrace> {
+  const encodedRequestId = encodeURIComponent(requestId.trim())
+  const { data } = await apiClient.get<OpsRouteTrace>(`/admin/ops/requests/${encodedRequestId}/route-trace`)
+  return data
+}
+
 // Alert rules
 export async function listAlertRules(): Promise<AlertRule[]> {
   const { data } = await apiClient.get<AlertRule[]>('/admin/ops/alert-rules')
@@ -1337,6 +1380,7 @@ export const opsAPI = {
   listRequestErrorUpstreamErrors,
 
   listRequestDetails,
+  getRouteTrace,
   listAlertRules,
   createAlertRule,
   updateAlertRule,
