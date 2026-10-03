@@ -57,6 +57,25 @@ type CreateUsageCleanupTaskRequest struct {
 	Timezone    string  `json:"timezone"`
 }
 
+// GetDetail 返回管理员使用记录详情；正文独立读取，不进入列表响应。
+// GET /api/v1/admin/usage/:id/detail
+func (h *UsageHandler) GetDetail(c *gin.Context) {
+	usageID, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
+	if err != nil || usageID <= 0 {
+		response.BadRequest(c, "Invalid usage ID")
+		return
+	}
+	usage, detail, err := h.usageService.GetDetailForUsage(c.Request.Context(), usageID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{
+		"usage":  dto.UsageLogFromServiceAdmin(usage),
+		"detail": detail,
+	})
+}
+
 // List handles listing all usage records with filters
 // GET /api/v1/admin/usage
 func (h *UsageHandler) List(c *gin.Context) {

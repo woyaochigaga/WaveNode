@@ -59,6 +59,14 @@ type GatewayHandler struct {
 	settingService            *service.SettingService
 }
 
+// UsageService 暴露网关使用记录服务，供路由层安装统一详情采集中间件。
+func (h *GatewayHandler) UsageService() *service.UsageService {
+	if h == nil {
+		return nil
+	}
+	return h.usageService
+}
+
 // NewGatewayHandler creates a new GatewayHandler
 func NewGatewayHandler(
 	gatewayService *service.GatewayService,

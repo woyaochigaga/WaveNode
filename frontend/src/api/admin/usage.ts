@@ -93,6 +93,30 @@ export interface AdminUsageQueryParams extends UsageQueryParams {
   status_code?: number | null
 }
 
+/** 网关采集的单次请求详情；正文已经在服务端完成凭证脱敏。 */
+export interface UsageLogDetail {
+  id: number
+  request_id: string
+  api_key_id: number
+  user_id: number
+  method: string
+  path: string
+  status_code: number
+  request_content_type: string
+  response_content_type: string
+  request_body: string
+  response_body: string
+  request_truncated: boolean
+  response_truncated: boolean
+  created_at: string
+  expires_at: string
+}
+
+export interface AdminUsageDetailResponse {
+  usage: AdminUsageLog
+  detail: UsageLogDetail | null
+}
+
 // ==================== API Functions ====================
 
 /**
@@ -135,6 +159,12 @@ export async function getStats(params: {
   const { data } = await apiClient.get<AdminUsageStatsResponse>('/admin/usage/stats', {
     params
   })
+  return data
+}
+
+/** 按使用记录 ID 按需读取输入输出，避免大字段进入列表接口。 */
+export async function getDetail(id: number): Promise<AdminUsageDetailResponse> {
+  const { data } = await apiClient.get<AdminUsageDetailResponse>(`/admin/usage/${id}/detail`)
   return data
 }
 
@@ -209,6 +239,7 @@ export async function cancelCleanupTask(taskId: number): Promise<{ id: number; s
 
 export const adminUsageAPI = {
   list,
+  getDetail,
   getStats,
   searchUsers,
   searchApiKeys,

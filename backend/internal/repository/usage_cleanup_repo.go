@@ -296,15 +296,22 @@ func (r *usageCleanupRepository) DeleteUsageLogsBatch(ctx context.Context, filte
 	}
 	query := fmt.Sprintf(`
 		WITH target AS (
-			SELECT id
+			SELECT id, request_id, api_key_id
 			FROM usage_logs
 			WHERE %s
 			ORDER BY created_at ASC, id ASC
 			LIMIT $%d
+		), deleted_details AS (
+			DELETE FROM usage_log_details d
+			USING target t
+			WHERE d.request_id = t.request_id AND d.api_key_id = t.api_key_id
+		), deleted_logs AS (
+			DELETE FROM usage_logs l
+			USING target t
+			WHERE l.id = t.id
+			RETURNING l.created_at
 		)
-		DELETE FROM usage_logs
-		WHERE id IN (SELECT id FROM target)
-		RETURNING created_at
+		SELECT created_at FROM deleted_logs
 	`, whereClause, len(args))
 
 	rows, err := r.sql.QueryContext(ctx, query, args...)
@@ -338,15 +345,22 @@ func (r *usageCleanupRepository) deleteUsageLogsBatchWithRollupInvalidation(ctx 
 	}
 	query := fmt.Sprintf(`
 		WITH target AS (
-			SELECT id
+			SELECT id, request_id, api_key_id
 			FROM usage_logs
 			WHERE %s
 			ORDER BY created_at ASC, id ASC
 			LIMIT $%d
+		), deleted_details AS (
+			DELETE FROM usage_log_details d
+			USING target t
+			WHERE d.request_id = t.request_id AND d.api_key_id = t.api_key_id
+		), deleted_logs AS (
+			DELETE FROM usage_logs l
+			USING target t
+			WHERE l.id = t.id
+			RETURNING l.created_at
 		)
-		DELETE FROM usage_logs
-		WHERE id IN (SELECT id FROM target)
-		RETURNING created_at
+		SELECT created_at FROM deleted_logs
 	`, whereClause, len(args))
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {

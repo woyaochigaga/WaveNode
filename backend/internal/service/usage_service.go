@@ -57,6 +57,7 @@ type UsageStats struct {
 // UsageService 使用统计服务
 type UsageService struct {
 	usageRepo            UsageLogRepository
+	detailRepo           UsageLogDetailRepository
 	userRepo             UserRepository
 	entClient            *dbent.Client
 	authCacheInvalidator APIKeyAuthCacheInvalidator
@@ -64,8 +65,10 @@ type UsageService struct {
 
 // NewUsageService 创建使用统计服务实例
 func NewUsageService(usageRepo UsageLogRepository, userRepo UserRepository, entClient *dbent.Client, authCacheInvalidator APIKeyAuthCacheInvalidator) *UsageService {
+	detailRepo, _ := usageRepo.(UsageLogDetailRepository)
 	return &UsageService{
 		usageRepo:            usageRepo,
+		detailRepo:           detailRepo,
 		userRepo:             userRepo,
 		entClient:            entClient,
 		authCacheInvalidator: authCacheInvalidator,
