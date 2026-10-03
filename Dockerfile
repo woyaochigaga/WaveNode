@@ -23,6 +23,9 @@ ARG NPM_CONFIG_REGISTRY=
 FROM --platform=${BUILDPLATFORM} ${NODE_IMAGE} AS frontend-builder
 ARG NPM_CONFIG_REGISTRY
 
+# 低内存服务器构建前端时提高 Node 堆上限，避免 vue-tsc 阶段因默认堆上限触发 OOM。
+ENV NODE_OPTIONS=--max-old-space-size=3072
+
 WORKDIR /app/frontend
 
 # Install pnpm (pinned to v9 to match CI and keep builds reproducible)
@@ -51,6 +54,9 @@ RUN pnpm run build
 # is a clean pure-Go cross-compile — no QEMU emulation of go mod download / go
 # build (emulated networking here was dropping module fetches with EOF).
 FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS backend-builder
+
+# 2GB 服务器上限制 Go 编译并发，降低 Ent 大量生成代码编译时的峰值内存。
+ENV GOMAXPROCS=1
 
 # Build arguments for version info (set by CI)
 ARG VERSION=
