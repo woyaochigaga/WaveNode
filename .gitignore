@@ -142,9 +142,6 @@ docs/*
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/channel-monitor-v2-safe-defaults.md
 !docs/PROJECT_IMPROVEMENT_ROADMAP_CN.md
-!docs/B4_LIVE_ASYNC_MEDIA_BILLING_GUARD_2026-10-02.md
-!docs/B5_MIGRATION_PREFLIGHT_BACKUP_RECOVERY_2026-10-02.md
-!docs/B6_CONFIG_VERSION_ERROR_ROUTE_TRACE_2026-10-02.md
 !docs/codex-credits.md
 !docs/legal/
 !docs/legal/*.md

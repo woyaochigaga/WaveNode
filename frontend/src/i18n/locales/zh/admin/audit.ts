@@ -1,7 +1,7 @@
 export default {
   audit: {
     title: '操作日志',
-    description: '记录管理员与用户的管理面操作，请求头凭证仅保留首尾、请求体已脱敏。日志无法单条删除，全量清理需二次验证。',
+    description: '记录管理员与用户的管理面操作，请求凭证及输入输出均已脱敏。日志无法单条删除，全量清理需二次验证。',
     clearAll: '全部清理',
     empty: '暂无操作日志',
     loadFailed: '加载操作日志失败',
@@ -17,6 +17,7 @@ export default {
       result: '结果',
       resultSuccess: '成功',
       resultFailure: '失败',
+      advanced: '高级筛选',
       startTime: '开始时间',
       endTime: '结束时间'
     },
@@ -38,6 +39,19 @@ export default {
       credential: '凭证（掩码）',
       userAgent: 'User-Agent',
       requestBody: '请求体（已脱敏）',
+      responseBody: '响应体（已脱敏）',
+      responseType: '响应类型',
+      pathParams: '路径参数',
+      queryParams: '查询参数',
+      noPathParams: '本次请求没有路径参数',
+      noQueryParams: '本次请求没有查询参数',
+      noRequestBody: '本次请求没有正文，或该历史记录尚未采集正文',
+      noResponseBody: '该历史记录尚未采集响应正文',
+      tabs: {
+        overview: '概览',
+        request: '请求输入',
+        response: '响应输出'
+      },
       extra: '附加信息'
     },
     clearConfirm: {

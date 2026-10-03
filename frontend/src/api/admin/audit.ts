@@ -24,7 +24,10 @@ export interface AuditLog {
   request_id: string
   client_ip: string
   user_agent: string
+  request_content_type: string
   request_body?: string
+  response_content_type: string
+  response_body?: string
   status_code: number
   latency_ms: number
   extra?: Record<string, any>
@@ -56,7 +59,7 @@ export async function list(params: AuditLogQuery): Promise<AuditLogListResponse>
 }
 
 /**
- * Get a single audit log entry (includes the redacted request body).
+ * Get a single audit log entry (includes redacted request and response bodies).
  */
 export async function get(id: number): Promise<AuditLog> {
   const { data } = await apiClient.get(`/admin/audit-logs/${id}`)

@@ -1,7 +1,7 @@
 export default {
   audit: {
     title: 'Audit Logs',
-    description: 'Records management-plane operations by admins and users. Header credentials keep only their first/last characters and request bodies are redacted. Entries cannot be deleted individually; clearing all requires two-factor verification.',
+    description: 'Records management-plane operations by admins and users. Credentials and request/response payloads are redacted. Entries cannot be deleted individually; clearing all requires two-factor verification.',
     clearAll: 'Clear All',
     empty: 'No audit logs yet',
     loadFailed: 'Failed to load audit logs',
@@ -17,6 +17,7 @@ export default {
       result: 'Result',
       resultSuccess: 'Success',
       resultFailure: 'Failure',
+      advanced: 'More Filters',
       startTime: 'Start Time',
       endTime: 'End Time'
     },
@@ -38,6 +39,19 @@ export default {
       credential: 'Credential (masked)',
       userAgent: 'User-Agent',
       requestBody: 'Request Body (redacted)',
+      responseBody: 'Response Body (redacted)',
+      responseType: 'Response Type',
+      pathParams: 'Path Parameters',
+      queryParams: 'Query Parameters',
+      noPathParams: 'This request has no path parameters',
+      noQueryParams: 'This request has no query parameters',
+      noRequestBody: 'This request has no body, or the historical entry predates body capture',
+      noResponseBody: 'This historical entry predates response capture',
+      tabs: {
+        overview: 'Overview',
+        request: 'Request Input',
+        response: 'Response Output'
+      },
       extra: 'Extra'
     },
     clearConfirm: {

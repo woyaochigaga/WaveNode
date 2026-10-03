@@ -25,7 +25,7 @@ func NewAuditLogRepository(db *sql.DB) service.AuditLogRepository {
 
 const auditLogInsertColumns = `created_at, actor_user_id, actor_email, actor_role, auth_method,
 credential_masked, action, method, path, request_id, client_ip, user_agent,
-request_body, status_code, latency_ms, extra`
+request_content_type, request_body, response_content_type, response_body, status_code, latency_ms, extra`
 
 func auditLogInsertValues(log *service.AuditLog) []any {
 	createdAt := log.CreatedAt
@@ -51,7 +51,10 @@ func auditLogInsertValues(log *service.AuditLog) []any {
 		truncateString(log.RequestID, 64),
 		truncateString(log.ClientIP, 64),
 		truncateString(log.UserAgent, 512),
+		truncateString(log.RequestContentType, 128),
 		log.RequestBody,
+		truncateString(log.ResponseContentType, 128),
+		log.ResponseBody,
 		log.StatusCode,
 		log.LatencyMs,
 		extraJSON,
@@ -74,7 +77,8 @@ func (r *auditLogRepository) BatchInsert(ctx context.Context, logs []*service.Au
 		"audit_logs",
 		"created_at", "actor_user_id", "actor_email", "actor_role", "auth_method",
 		"credential_masked", "action", "method", "path", "request_id", "client_ip", "user_agent",
-		"request_body", "status_code", "latency_ms", "extra",
+		"request_content_type", "request_body", "response_content_type", "response_body",
+		"status_code", "latency_ms", "extra",
 	))
 	if err != nil {
 		_ = tx.Rollback()
@@ -117,7 +121,7 @@ func (r *auditLogRepository) Insert(ctx context.Context, log *service.AuditLog) 
 		return fmt.Errorf("nil audit log")
 	}
 	query := `INSERT INTO audit_logs (` + auditLogInsertColumns + `)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`
 	_, err := r.db.ExecContext(ctx, query, auditLogInsertValues(log)...)
 	return err
 }
@@ -175,7 +179,7 @@ func buildAuditLogsWhere(filter *service.AuditLogFilter) (string, []any) {
 	return "WHERE " + strings.Join(clauses, " AND "), args
 }
 
-const auditLogSelectColumns = `
+const auditLogListSelectColumns = `
   l.id,
   l.created_at,
   l.actor_user_id,
@@ -189,16 +193,21 @@ const auditLogSelectColumns = `
   COALESCE(l.request_id, ''),
   COALESCE(l.client_ip, ''),
   COALESCE(l.user_agent, ''),
-  COALESCE(l.request_body, ''),
+  COALESCE(l.request_content_type, ''),
+  COALESCE(l.response_content_type, ''),
   l.status_code,
   l.latency_ms,
   COALESCE(l.extra::text, '{}')`
 
-func scanAuditLogRow(scan func(dest ...any) error) (*service.AuditLog, error) {
+const auditLogDetailSelectColumns = auditLogListSelectColumns + `,
+  COALESCE(l.request_body, ''),
+  COALESCE(l.response_body, '')`
+
+func scanAuditLogRow(scan func(dest ...any) error, includeBodies bool) (*service.AuditLog, error) {
 	item := &service.AuditLog{}
 	var actorUserID sql.NullInt64
 	var extraRaw string
-	if err := scan(
+	dest := []any{
 		&item.ID,
 		&item.CreatedAt,
 		&actorUserID,
@@ -212,11 +221,16 @@ func scanAuditLogRow(scan func(dest ...any) error) (*service.AuditLog, error) {
 		&item.RequestID,
 		&item.ClientIP,
 		&item.UserAgent,
-		&item.RequestBody,
+		&item.RequestContentType,
+		&item.ResponseContentType,
 		&item.StatusCode,
 		&item.LatencyMs,
 		&extraRaw,
-	); err != nil {
+	}
+	if includeBodies {
+		dest = append(dest, &item.RequestBody, &item.ResponseBody)
+	}
+	if err := scan(dest...); err != nil {
 		return nil, err
 	}
 	if actorUserID.Valid {
@@ -262,7 +276,7 @@ func (r *auditLogRepository) List(ctx context.Context, filter *service.AuditLogF
 
 	offset := (page - 1) * pageSize
 	argsWithLimit := append(args, pageSize, offset)
-	query := "SELECT" + auditLogSelectColumns + "\nFROM audit_logs l\n" + where + `
+	query := "SELECT" + auditLogListSelectColumns + "\nFROM audit_logs l\n" + where + `
 ORDER BY l.created_at DESC, l.id DESC
 LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 
@@ -274,12 +288,10 @@ LIMIT $` + itoa(len(args)+1) + ` OFFSET $` + itoa(len(args)+2)
 
 	logs := make([]*service.AuditLog, 0, pageSize)
 	for rows.Next() {
-		item, err := scanAuditLogRow(rows.Scan)
+		item, err := scanAuditLogRow(rows.Scan, false)
 		if err != nil {
 			return nil, err
 		}
-		// 列表页不返回 body，降低载荷；详情接口返回完整记录。
-		item.RequestBody = ""
 		logs = append(logs, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -298,9 +310,9 @@ func (r *auditLogRepository) GetByID(ctx context.Context, id int64) (*service.Au
 	if r == nil || r.db == nil {
 		return nil, fmt.Errorf("nil audit log repository")
 	}
-	query := "SELECT" + auditLogSelectColumns + "\nFROM audit_logs l WHERE l.id = $1"
+	query := "SELECT" + auditLogDetailSelectColumns + "\nFROM audit_logs l WHERE l.id = $1"
 	row := r.db.QueryRowContext(ctx, query, id)
-	item, err := scanAuditLogRow(row.Scan)
+	item, err := scanAuditLogRow(row.Scan, true)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, service.ErrAuditLogNotFound

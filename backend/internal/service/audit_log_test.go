@@ -70,6 +70,7 @@ func TestSensitiveLeakageCanaryIsRedactedAtAuditQueueBoundary(t *testing.T) {
 	entry := &AuditLog{
 		UserAgent:   "Cookie: session=" + canary,
 		RequestBody: `{"rawPrompt":"` + canary + `"}`,
+		ResponseBody: `{"access_token":"` + canary + `"}`,
 		Extra: map[string]any{
 			"authorization": "Bearer " + canary,
 			"nested":        map[string]any{"proxy_password": canary},

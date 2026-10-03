@@ -193,3 +193,46 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestAuditMiddlewareCapturesAndRedactsJSONResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repository := &auditCaptureRepository{}
+	auditService := service.NewAuditLogService(repository, nil)
+	auditService.Start()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyUser), AuthSubject{UserID: 77})
+		c.Set(string(ContextKeyUserRole), "admin")
+		c.Next()
+	})
+	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService)))
+	router.POST("/api/v1/admin/accounts", func(c *gin.Context) {
+		c.JSON(http.StatusCreated, gin.H{
+			"data": gin.H{
+				"name":         "visible-account",
+				"access_token": "response-secret-canary",
+			},
+		})
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts",
+		bytes.NewBufferString(`{"name":"request-visible","api_key":"request-secret-canary"}`))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusCreated, recorder.Code)
+	auditService.Stop()
+
+	repository.mu.Lock()
+	logs := append([]*service.AuditLog(nil), repository.logs...)
+	repository.mu.Unlock()
+	require.Len(t, logs, 1)
+	entry := logs[0]
+	require.Equal(t, "application/json", entry.RequestContentType)
+	require.Contains(t, entry.ResponseContentType, "application/json")
+	require.Contains(t, entry.RequestBody, "request-visible")
+	require.NotContains(t, entry.RequestBody, "request-secret-canary")
+	require.Contains(t, entry.ResponseBody, "visible-account")
+	require.NotContains(t, entry.ResponseBody, "response-secret-canary")
+}

@@ -84,7 +84,7 @@ func (h *AuditLogHandler) List(c *gin.Context) {
 	response.Paginated(c, result.Logs, int64(result.Total), result.Page, result.PageSize)
 }
 
-// Get 查询单条审计日志详情（含脱敏后的请求体）。
+// Get 查询单条审计日志详情（含脱敏后的请求体与响应体）。
 // GET /api/v1/admin/audit-logs/:id
 func (h *AuditLogHandler) Get(c *gin.Context) {
 	id, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)

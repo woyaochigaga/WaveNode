@@ -3,80 +3,83 @@
     <TablePageLayout>
       <!-- Filters -->
       <template #filters>
-        <div class="card p-4 sm:p-6">
-          <div class="flex flex-wrap items-end justify-between gap-4">
-            <!-- Left: filter fields -->
-            <div class="flex flex-1 flex-wrap items-end gap-4">
-              <div class="w-full sm:w-auto sm:min-w-[240px]">
-                <label class="input-label">{{ t('admin.audit.filters.q') }}</label>
-                <div class="relative">
-                  <Icon
-                    name="search"
-                    size="md"
-                    class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    v-model.trim="filters.q"
-                    type="text"
-                    class="input pl-10"
-                    :placeholder="t('admin.audit.filters.qPlaceholder')"
-                    @keyup.enter="search"
-                  />
-                </div>
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[200px]">
-                <label class="input-label">{{ t('admin.audit.filters.actorEmail') }}</label>
-                <input v-model.trim="filters.actor_email" type="text" class="input" @keyup.enter="search" />
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[180px]">
-                <label class="input-label">{{ t('admin.audit.filters.action') }}</label>
-                <input v-model.trim="filters.action" type="text" class="input" @keyup.enter="search" />
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[160px]">
-                <label class="input-label">{{ t('admin.audit.filters.clientIp') }}</label>
-                <input v-model.trim="filters.client_ip" type="text" class="input" @keyup.enter="search" />
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[140px]">
-                <label class="input-label">{{ t('admin.audit.filters.method') }}</label>
-                <Select v-model="filters.method" :options="methodOptions" @change="search" />
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[170px]">
-                <label class="input-label">{{ t('admin.audit.filters.authMethod') }}</label>
-                <Select v-model="filters.auth_method" :options="authMethodOptions" @change="search" />
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[140px]">
-                <label class="input-label">{{ t('admin.audit.filters.result') }}</label>
-                <Select v-model="filters.success" :options="resultOptions" @change="search" />
-              </div>
-
-              <div class="w-full sm:w-auto sm:min-w-[170px]">
-                <label class="input-label">{{ t('admin.dashboard.timeRange') }}</label>
-                <Select
-                  :model-value="timeRange"
-                  :options="timeRangeOptions"
-                  @update:model-value="handleTimeRangeChange"
+        <div class="card p-3 sm:p-4">
+          <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(300px,1fr)_150px_190px_auto]">
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.q') }}</label>
+              <div class="relative">
+                <Icon name="search" size="md" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  v-model.trim="filters.q"
+                  type="text"
+                  class="input pl-10"
+                  :placeholder="t('admin.audit.filters.qPlaceholder')"
+                  @keyup.enter="search"
                 />
               </div>
             </div>
 
-            <!-- Right: actions -->
-            <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.result') }}</label>
+              <Select v-model="filters.success" :options="resultOptions" @change="search" />
+            </div>
+
+            <div>
+              <label class="input-label">{{ t('admin.dashboard.timeRange') }}</label>
+              <Select
+                :model-value="timeRange"
+                :options="timeRangeOptions"
+                @update:model-value="handleTimeRangeChange"
+              />
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                :aria-expanded="advancedFiltersOpen"
+                @click="advancedFiltersOpen = !advancedFiltersOpen"
+              >
+                <Icon name="filter" size="sm" class="mr-1.5" />
+                {{ t('admin.audit.filters.advanced') }}
+                <span v-if="advancedFilterCount" class="ml-1 rounded-full bg-primary-100 px-1.5 text-xs text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
+                  {{ advancedFilterCount }}
+                </span>
+              </button>
               <button type="button" class="btn btn-primary" :disabled="loading" @click="search">
+                <Icon name="search" size="sm" class="mr-1.5" />
                 {{ t('common.search') }}
               </button>
               <button type="button" class="btn btn-secondary" :disabled="loading" @click="resetFilters">
                 {{ t('common.reset') }}
               </button>
-              <button type="button" class="btn btn-danger" @click="openClearDialog">
-                <Icon name="trash" size="sm" class="mr-1.5" />
-                {{ t('admin.audit.clearAll') }}
+              <button type="button" class="btn btn-danger" :title="t('admin.audit.clearAll')" @click="openClearDialog">
+                <Icon name="trash" size="sm" />
+                <span class="sr-only">{{ t('admin.audit.clearAll') }}</span>
               </button>
+            </div>
+          </div>
+
+          <div v-if="advancedFiltersOpen" class="mt-3 grid grid-cols-1 gap-3 border-t border-gray-200 pt-3 sm:grid-cols-2 lg:grid-cols-5 dark:border-dark-700">
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.actorEmail') }}</label>
+              <input v-model.trim="filters.actor_email" type="text" class="input" @keyup.enter="search" />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.action') }}</label>
+              <input v-model.trim="filters.action" type="text" class="input" @keyup.enter="search" />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.clientIp') }}</label>
+              <input v-model.trim="filters.client_ip" type="text" class="input" @keyup.enter="search" />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.method') }}</label>
+              <Select v-model="filters.method" :options="methodOptions" @change="search" />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.audit.filters.authMethod') }}</label>
+              <Select v-model="filters.auth_method" :options="authMethodOptions" @change="search" />
             </div>
           </div>
         </div>
@@ -163,7 +166,7 @@
     <BaseDialog
       :show="detailVisible"
       :title="t('admin.audit.detail.title')"
-      width="wide"
+      width="extra-wide"
       :close-on-click-outside="true"
       @close="detailVisible = false"
     >
@@ -174,9 +177,9 @@
         </div>
       </div>
 
-      <div v-else-if="detail" class="space-y-5 py-2">
+      <div v-else-if="detail" class="min-w-0 space-y-4 py-2">
         <!-- Hero: action + result at a glance -->
-        <div class="rounded-2xl border border-gray-200 bg-gray-50/60 p-5 dark:border-dark-700 dark:bg-dark-900/60">
+        <div class="min-w-0 rounded-lg border border-gray-200 bg-gray-50/60 p-5 dark:border-dark-700 dark:bg-dark-900/60">
           <div class="flex flex-wrap items-center gap-3">
             <span :class="statusBadgeClass(detail.status_code)">
               <span class="h-1.5 w-1.5 rounded-full" :class="statusDotClass(detail.status_code)"></span>
@@ -191,7 +194,7 @@
             <span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-gray-700 dark:bg-dark-700 dark:text-gray-200">
               {{ detail.method }}
             </span>
-            <span class="break-all font-mono text-xs text-gray-600 dark:text-gray-300">{{ detail.path }}</span>
+            <span class="min-w-0 break-all font-mono text-xs text-gray-600 dark:text-gray-300">{{ detail.path }}</span>
           </div>
 
           <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -207,65 +210,95 @@
           </div>
         </div>
 
-        <!-- Actor / auth / source -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-900">
-            <div class="text-xs font-bold uppercase tracking-wider text-gray-400">
-              {{ t('admin.audit.columns.actor') }}
-            </div>
-            <div class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">
-              {{ detail.actor_email || '—' }}
-            </div>
-            <div class="mt-0.5 text-xs text-gray-400">{{ detail.actor_role }}</div>
-          </div>
+        <div class="grid grid-cols-3 rounded-lg bg-gray-100 p-1 dark:bg-dark-800" role="tablist">
+          <button
+            v-for="tab in detailTabs"
+            :key="tab.value"
+            type="button"
+            role="tab"
+            :aria-selected="detailTab === tab.value"
+            :class="[
+              'h-9 rounded-md px-3 text-sm font-medium transition-colors',
+              detailTab === tab.value
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-600 dark:text-white'
+                : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+            @click="detailTab = tab.value"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
 
-          <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-900">
-            <div class="text-xs font-bold uppercase tracking-wider text-gray-400">
-              {{ t('admin.audit.filters.authMethod') }}
+        <div v-if="detailTab === 'overview'" class="space-y-4">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
+              <div class="text-xs font-bold uppercase text-gray-400">{{ t('admin.audit.columns.actor') }}</div>
+              <div class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ detail.actor_email || '—' }}</div>
+              <div class="mt-0.5 text-xs text-gray-400">{{ detail.actor_role }}</div>
             </div>
-            <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-              {{ authMethodLabel(detail.auth_method) || '—' }}
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
+              <div class="text-xs font-bold uppercase text-gray-400">{{ t('admin.audit.filters.authMethod') }}</div>
+              <div class="mt-1 text-sm font-medium text-gray-900 dark:text-white">{{ authMethodLabel(detail.auth_method) || '—' }}</div>
+              <div v-if="detail.credential_masked" class="mt-0.5 break-all font-mono text-xs text-gray-400">{{ detail.credential_masked }}</div>
             </div>
-            <div v-if="detail.credential_masked" class="mt-0.5 break-all font-mono text-xs text-gray-400">
-              {{ detail.credential_masked }}
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
+              <div class="text-xs font-bold uppercase text-gray-400">{{ t('admin.audit.columns.clientIp') }}</div>
+              <div class="mt-1 break-all font-mono text-sm font-medium text-gray-900 dark:text-white">{{ detail.client_ip || '—' }}</div>
             </div>
           </div>
+          <PayloadBlock :title="t('admin.audit.detail.userAgent')" :content="detail.user_agent || '—'" />
+          <PayloadBlock
+            v-if="detailMetadata"
+            :title="t('admin.audit.detail.extra')"
+            :content="JSON.stringify(detailMetadata, null, 2)"
+          />
+        </div>
 
-          <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-900">
-            <div class="text-xs font-bold uppercase tracking-wider text-gray-400">
-              {{ t('admin.audit.columns.clientIp') }}
-            </div>
-            <div class="mt-1 break-all font-mono text-sm font-medium text-gray-900 dark:text-white">
-              {{ detail.client_ip || '—' }}
-            </div>
+        <div v-else-if="detailTab === 'request'" class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <PayloadBlock
+            :title="t('admin.audit.detail.pathParams')"
+            :content="formatStructuredValue(detail.extra?.params)"
+            :empty-text="t('admin.audit.detail.noPathParams')"
+          />
+          <PayloadBlock
+            :title="t('admin.audit.detail.queryParams')"
+            :content="formatQuery(detail.extra?.query)"
+            :empty-text="t('admin.audit.detail.noQueryParams')"
+          />
+          <div class="lg:col-span-2">
+            <PayloadBlock
+              :title="t('admin.audit.detail.requestBody')"
+              :content="detail.request_body ? prettyBody(detail.request_body) : ''"
+              :content-type="detail.request_content_type"
+              :empty-text="t('admin.audit.detail.noRequestBody')"
+              tall
+            />
           </div>
         </div>
 
-        <!-- User-Agent -->
-        <section>
-          <h4 class="mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-            {{ t('admin.audit.detail.userAgent') }}
-          </h4>
-          <div class="break-all rounded-xl bg-gray-50 p-3 font-mono text-xs leading-relaxed text-gray-600 dark:bg-dark-900 dark:text-gray-400">
-            {{ detail.user_agent || '—' }}
+        <div v-else class="space-y-4">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
+              <div class="text-xs font-bold uppercase text-gray-400">{{ t('admin.audit.columns.result') }}</div>
+              <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ detail.status_code }} {{ statusText(detail.status_code) }}</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
+              <div class="text-xs font-bold uppercase text-gray-400">{{ t('admin.audit.detail.latency') }}</div>
+              <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ detail.latency_ms }} ms</div>
+            </div>
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
+              <div class="text-xs font-bold uppercase text-gray-400">{{ t('admin.audit.detail.responseType') }}</div>
+              <div class="mt-1 break-all font-mono text-xs text-gray-700 dark:text-gray-300">{{ detail.response_content_type || '—' }}</div>
+            </div>
           </div>
-        </section>
-
-        <!-- Request body (redacted) -->
-        <section v-if="detail.request_body">
-          <h4 class="mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-            {{ t('admin.audit.detail.requestBody') }}
-          </h4>
-          <pre class="max-h-72 overflow-auto rounded-xl bg-gray-50 p-4 font-mono text-xs leading-relaxed text-gray-600 dark:bg-dark-900 dark:text-gray-400">{{ prettyBody(detail.request_body) }}</pre>
-        </section>
-
-        <!-- Extra -->
-        <section v-if="detail.extra && Object.keys(detail.extra).length">
-          <h4 class="mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-            {{ t('admin.audit.detail.extra') }}
-          </h4>
-          <pre class="max-h-48 overflow-auto rounded-xl bg-gray-50 p-4 font-mono text-xs leading-relaxed text-gray-600 dark:bg-dark-900 dark:text-gray-400">{{ JSON.stringify(detail.extra, null, 2) }}</pre>
-        </section>
+          <PayloadBlock
+            :title="t('admin.audit.detail.responseBody')"
+            :content="detail.response_body ? prettyBody(detail.response_body) : ''"
+            :content-type="detail.response_content_type"
+            :empty-text="t('admin.audit.detail.noResponseBody')"
+            tall
+          />
+        </div>
       </div>
     </BaseDialog>
 
@@ -365,6 +398,7 @@ import Select from '@/components/common/Select.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import PayloadBlock from '@/components/admin/audit/AuditPayloadBlock.vue'
 import { useAppStore } from '@/stores'
 
 const { t } = useI18n()
@@ -375,6 +409,7 @@ const logs = ref<AuditLog[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
+const advancedFiltersOpen = ref(false)
 
 const filters = reactive({
   q: '',
@@ -385,6 +420,12 @@ const filters = reactive({
   auth_method: '',
   success: ''
 })
+
+// 高级条件保持折叠，但用数量徽标提醒当前仍在生效的筛选项。
+const advancedFilterCount = computed(() =>
+  [filters.actor_email, filters.action, filters.client_ip, filters.method, filters.auth_method]
+    .filter(Boolean).length
+)
 
 // 时间范围：预设窗口（同 /admin/ops 时间下拉）+ 自定义起止（datetime-local，支持时分）
 const timeRange = ref('')
@@ -580,11 +621,24 @@ function onPageSizeChange(ps: number) {
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<AuditLog | null>(null)
+const detailTab = ref<'overview' | 'request' | 'response'>('overview')
+const detailTabs = computed(() => [
+  { value: 'overview' as const, label: t('admin.audit.detail.tabs.overview') },
+  { value: 'request' as const, label: t('admin.audit.detail.tabs.request') },
+  { value: 'response' as const, label: t('admin.audit.detail.tabs.response') }
+])
+
+const detailMetadata = computed(() => {
+  if (!detail.value?.extra) return null
+  const { params: _params, query: _query, ...metadata } = detail.value.extra
+  return Object.keys(metadata).length ? metadata : null
+})
 
 async function openDetail(id: number) {
   detailVisible.value = true
   detailLoading.value = true
   detail.value = null
+  detailTab.value = 'overview'
   try {
     detail.value = await adminAPI.audit.get(id)
   } catch (err: any) {
@@ -601,6 +655,25 @@ function prettyBody(body: string): string {
   } catch {
     return body
   }
+}
+
+function formatStructuredValue(value: unknown): string {
+  if (value == null || value === '') return ''
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+}
+
+// 查询参数转为逐字段 JSON，重复参数保留为数组，便于定位真实输入。
+function formatQuery(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) return ''
+  const params = new URLSearchParams(value)
+  const result: Record<string, string | string[]> = {}
+  for (const [key, item] of params.entries()) {
+    const current = result[key]
+    if (current == null) result[key] = item
+    else if (Array.isArray(current)) current.push(item)
+    else result[key] = [current, item]
+  }
+  return Object.keys(result).length ? JSON.stringify(result, null, 2) : value
 }
 
 // Clear-all flow: confirm → TOTP → clear

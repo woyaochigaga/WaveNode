@@ -206,6 +206,8 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 		}
 
 		start := time.Now()
+		responseCapture := &auditResponseWriter{ResponseWriter: c.Writer}
+		c.Writer = responseCapture
 		c.Next()
 
 		if c.GetBool(auditCtxKeySkip) {
@@ -219,15 +221,18 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 		}
 
 		entry := &service.AuditLog{
-			CreatedAt:   time.Now().UTC(),
-			Action:      action,
-			Method:      c.Request.Method,
-			Path:        c.FullPath(),
-			ClientIP:    SecurityClientIP(c),
-			UserAgent:   c.Request.UserAgent(),
-			RequestBody: bodyRedacted,
-			StatusCode:  status,
-			LatencyMs:   time.Since(start).Milliseconds(),
+			CreatedAt:           time.Now().UTC(),
+			Action:              action,
+			Method:              c.Request.Method,
+			Path:                c.FullPath(),
+			ClientIP:            SecurityClientIP(c),
+			UserAgent:           c.Request.UserAgent(),
+			RequestContentType:  c.GetHeader("Content-Type"),
+			RequestBody:         bodyRedacted,
+			ResponseContentType: c.Writer.Header().Get("Content-Type"),
+			ResponseBody:        service.RedactAuditBody(responseCapture.body, c.Writer.Header().Get("Content-Type")),
+			StatusCode:          status,
+			LatencyMs:           time.Since(start).Milliseconds(),
 		}
 		if entry.Path == "" {
 			entry.Path = c.Request.URL.Path
@@ -295,6 +300,34 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 
 		auditService.Record(entry)
 	})
+}
+
+// auditResponseWriter 只保留响应前缀用于审计，完整响应仍直接写给客户端。
+// 多出的 1 字节用于让 RedactAuditBody 判断正文已超过安全入库上限。
+type auditResponseWriter struct {
+	gin.ResponseWriter
+	body []byte
+}
+
+func (w *auditResponseWriter) Write(data []byte) (int, error) {
+	w.capture(data)
+	return w.ResponseWriter.Write(data)
+}
+
+func (w *auditResponseWriter) WriteString(data string) (int, error) {
+	w.capture([]byte(data))
+	return w.ResponseWriter.WriteString(data)
+}
+
+func (w *auditResponseWriter) capture(data []byte) {
+	remaining := service.AuditRequestBodyCaptureLimit + 1 - len(w.body)
+	if remaining <= 0 {
+		return
+	}
+	if len(data) > remaining {
+		data = data[:remaining]
+	}
+	w.body = append(w.body, data...)
 }
 
 // restoredBody 把审计中间件按上限读出的前缀与未读完的原始 body 拼接回填，

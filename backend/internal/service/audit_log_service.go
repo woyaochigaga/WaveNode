@@ -141,6 +141,7 @@ func redactAuditLogEntry(entry *AuditLog) *AuditLog {
 	safe.UserAgent = logredact.RedactText(entry.UserAgent)
 	safe.CredentialMasked = logredact.RedactText(entry.CredentialMasked)
 	safe.RequestBody = logredact.RedactText(entry.RequestBody)
+	safe.ResponseBody = logredact.RedactText(entry.ResponseBody)
 	if entry.Extra != nil {
 		safe.Extra = logredact.RedactMap(entry.Extra)
 	}

@@ -392,6 +392,16 @@
           </div>
         </div>
 
+        <AccountQuotaOverview
+          v-if="account"
+          :account="account"
+          :usage="quotaUsage"
+          :loading="quotaLoading"
+          :error="quotaError"
+          :refreshable="supportsQuotaUsageQuery"
+          @refresh="loadQuotaUsage(true)"
+        />
+
         <!-- Usage Trend Chart -->
         <div class="card p-4">
           <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
@@ -466,9 +476,10 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
+import AccountQuotaOverview from './AccountQuotaOverview.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { adminAPI } from '@/api/admin'
-import type { Account, AccountUsageStatsResponse } from '@/types'
+import type { Account, AccountUsageInfo, AccountUsageStatsResponse } from '@/types'
 
 ChartJS.register(
   CategoryScale,
@@ -494,6 +505,15 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const stats = ref<AccountUsageStatsResponse | null>(null)
+const quotaLoading = ref(false)
+const quotaUsage = ref<AccountUsageInfo | null>(null)
+const quotaError = ref('')
+const supportsQuotaUsageQuery = computed(() => {
+  const account = props.account
+  if (!account) return false
+  return account.type === 'oauth' || account.type === 'setup-token' ||
+    account.platform === 'gemini' || account.platform === 'antigravity' || account.platform === 'grok'
+})
 
 // Dark mode detection
 const isDarkMode = computed(() => {
@@ -644,12 +664,15 @@ const lineChartOptions = computed(() => ({
 
 // Load stats when modal opens
 watch(
-  () => props.show,
-  async (newVal) => {
-    if (newVal && props.account) {
-      await loadStats()
+  () => [props.show, props.account?.id] as const,
+  ([show]) => {
+    if (show && props.account) {
+      void loadStats()
+      void loadQuotaUsage(false)
     } else {
       stats.value = null
+      quotaUsage.value = null
+      quotaError.value = ''
     }
   }
 )
@@ -665,6 +688,22 @@ const loadStats = async () => {
     stats.value = null
   } finally {
     loading.value = false
+  }
+}
+
+// 主动查询上游额度；单独维护状态，避免慢额度接口阻塞 30 天统计展示。
+const loadQuotaUsage = async (force: boolean) => {
+  if (!props.account || !supportsQuotaUsageQuery.value || quotaLoading.value) return
+
+  quotaLoading.value = true
+  quotaError.value = ''
+  try {
+    quotaUsage.value = await adminAPI.accounts.getUsage(props.account.id, 'active', force)
+  } catch (error: any) {
+    console.error('Failed to load account quota usage:', error)
+    quotaError.value = error?.message || t('admin.accounts.stats.quota.loadFailed')
+  } finally {
+    quotaLoading.value = false
   }
 }
 

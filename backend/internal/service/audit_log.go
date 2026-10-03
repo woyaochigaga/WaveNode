@@ -41,23 +41,26 @@ const (
 
 // AuditLog 一条管理面操作审计记录。
 type AuditLog struct {
-	ID               int64          `json:"id"`
-	CreatedAt        time.Time      `json:"created_at"`
-	ActorUserID      *int64         `json:"actor_user_id,omitempty"`
-	ActorEmail       string         `json:"actor_email"`
-	ActorRole        string         `json:"actor_role"`
-	AuthMethod       string         `json:"auth_method"`
-	CredentialMasked string         `json:"credential_masked"`
-	Action           string         `json:"action"`
-	Method           string         `json:"method"`
-	Path             string         `json:"path"`
-	RequestID        string         `json:"request_id"`
-	ClientIP         string         `json:"client_ip"`
-	UserAgent        string         `json:"user_agent"`
-	RequestBody      string         `json:"request_body,omitempty"`
-	StatusCode       int            `json:"status_code"`
-	LatencyMs        int64          `json:"latency_ms"`
-	Extra            map[string]any `json:"extra,omitempty"`
+	ID                  int64          `json:"id"`
+	CreatedAt           time.Time      `json:"created_at"`
+	ActorUserID         *int64         `json:"actor_user_id,omitempty"`
+	ActorEmail          string         `json:"actor_email"`
+	ActorRole           string         `json:"actor_role"`
+	AuthMethod          string         `json:"auth_method"`
+	CredentialMasked    string         `json:"credential_masked"`
+	Action              string         `json:"action"`
+	Method              string         `json:"method"`
+	Path                string         `json:"path"`
+	RequestID           string         `json:"request_id"`
+	ClientIP            string         `json:"client_ip"`
+	UserAgent           string         `json:"user_agent"`
+	RequestContentType  string         `json:"request_content_type"`
+	RequestBody         string         `json:"request_body,omitempty"`
+	ResponseContentType string         `json:"response_content_type"`
+	ResponseBody        string         `json:"response_body,omitempty"`
+	StatusCode          int            `json:"status_code"`
+	LatencyMs           int64          `json:"latency_ms"`
+	Extra               map[string]any `json:"extra,omitempty"`
 }
 
 // AuditLogFilter 审计日志列表查询条件。
@@ -173,7 +176,7 @@ func isAuditSensitiveBodyKey(key string) bool {
 
 const auditRedactedPlaceholder = "***"
 
-// RedactAuditBody 对请求体做审计入库前的脱敏：
+// RedactAuditBody 对请求体或响应体做审计入库前的脱敏：
 //   - JSON：递归擦除敏感键的值（保留结构，base_url 等非敏感字段可见以便追责）
 //   - 非 JSON：返回占位说明
 //   - 超长：截断并附截断标记
