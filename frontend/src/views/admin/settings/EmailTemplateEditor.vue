@@ -54,7 +54,7 @@
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label class="input-label" for="email-template-event">
-              {{ t("admin.settings.emailTemplates.event") }}
+              {{ t("admin.settings.emailTemplates.event") }} <SettingHelp :title="t('admin.settings.emailTemplates.event')">{{ t('admin.settings.fieldHelp.emailTemplates_event') }}</SettingHelp>
             </label>
             <select
               id="email-template-event"
@@ -73,7 +73,7 @@
           </div>
           <div>
             <label class="input-label" for="email-template-locale">
-              {{ t("admin.settings.emailTemplates.locale") }}
+              {{ t("admin.settings.emailTemplates.locale") }} <SettingHelp :title="t('admin.settings.emailTemplates.locale')">{{ t('admin.settings.fieldHelp.emailTemplates_locale') }}</SettingHelp>
             </label>
             <select
               id="email-template-locale"
@@ -138,7 +138,7 @@
           <div class="space-y-4">
             <div>
               <label class="input-label" for="email-template-subject">
-                {{ t("admin.settings.emailTemplates.subject") }}
+                {{ t("admin.settings.emailTemplates.subject") }} <SettingHelp :title="t('admin.settings.emailTemplates.subject')">{{ t('admin.settings.fieldHelp.emailTemplates_subject') }}</SettingHelp>
               </label>
               <input
                 id="email-template-subject"
@@ -152,7 +152,7 @@
 
             <div>
               <label class="input-label" for="email-template-html">
-                {{ t("admin.settings.emailTemplates.html") }}
+                {{ t("admin.settings.emailTemplates.html") }} <SettingHelp :title="t('admin.settings.emailTemplates.html')">{{ t('admin.settings.fieldHelp.emailTemplates_html') }}</SettingHelp>
               </label>
               <textarea
                 id="email-template-html"
@@ -230,6 +230,7 @@
 </template>
 
 <script setup lang="ts">
+import SettingHelp from "@/components/admin/SettingHelp.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api";

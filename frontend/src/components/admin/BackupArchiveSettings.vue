@@ -4,13 +4,13 @@
       <h4 id="backup-archive-title" class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.backup.archive.title') }}</h4>
       <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
         <input data-testid="archive-enabled" type="checkbox" :checked="modelValue.enabled" @change="update({ enabled: ($event.target as HTMLInputElement).checked })" />
-        {{ t('admin.backup.archive.enabled') }}
+        {{ t('admin.backup.archive.enabled') }} <SettingHelp :title="t('admin.backup.archive.enabled')">{{ t('admin.settings.fieldHelp.archive_enabled') }}</SettingHelp>
       </label>
     </div>
     <div v-if="modelValue.enabled">
       <div class="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
         <div>
-          <label for="backup-archive-dates" class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.archive.dates') }}</label>
+          <label for="backup-archive-dates" class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.archive.dates') }} <SettingHelp :title="t('admin.backup.archive.dates')">{{ t('admin.backup.archive.datesHint') }}</SettingHelp></label>
           <div ref="datePicker" class="relative" @keydown.esc.stop.prevent="closeDates(true)" @focusout="handleFocusOut">
             <button
               id="backup-archive-dates" ref="dateTrigger" type="button" class="input flex w-full items-center justify-between gap-2 text-left"
@@ -44,7 +44,7 @@
           <p id="backup-archive-dates-hint" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.archive.datesHint') }}</p>
         </div>
         <div>
-          <span class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.archive.retention') }}</span>
+          <span class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('admin.backup.archive.retention') }} <SettingHelp :title="t('admin.backup.archive.retention')">{{ t(forever ? 'admin.backup.archive.foreverHint' : 'admin.backup.archive.countHint') }}</SettingHelp></span>
           <div class="flex min-h-10 flex-wrap items-center gap-3">
             <label v-if="!forever" class="flex min-w-0 flex-1 items-center gap-2">
               <input data-testid="archive-count" :value="modelValue.retain_count" type="number" min="1" step="1" class="input w-full min-w-0" :aria-label="t('admin.backup.archive.count')" aria-describedby="backup-archive-retention-hint" @input="setCount" />
@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import SettingHelp from "@/components/admin/SettingHelp.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'

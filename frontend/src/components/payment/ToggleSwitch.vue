@@ -1,6 +1,6 @@
 <template>
   <label class="flex flex-col items-center gap-0.5 cursor-pointer">
-    <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ label }}</span>
+    <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ label }} <SettingHelp v-if="help" :title="label">{{ help }}</SettingHelp></span>
     <button
       type="button"
       role="switch"
@@ -20,6 +20,9 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ label: string; checked: boolean }>()
+import SettingHelp from '@/components/admin/SettingHelp.vue'
+
+// 配置页可以补充用途说明，其他开关保持原有展示。
+defineProps<{ label: string; checked: boolean; help?: string }>()
 const emit = defineEmits<{ toggle: [] }>()
 </script>

@@ -159,6 +159,11 @@
                   <Icon name="user" size="sm" />
                   {{ t('nav.profile') }}
                 </router-link>
+                <!-- 管理入口随账户菜单展示，普通用户不显示。 -->
+                <router-link v-if="authStore.isAdmin" to="/admin/settings" @click="closeDropdown" class="dropdown-item">
+                  <Icon name="cog" size="sm" />
+                  {{ t('nav.settings') }}
+                </router-link>
               </div>
 
               <!-- Contact Support (only show if configured) -->

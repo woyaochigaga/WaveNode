@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -13,6 +13,8 @@ function getTooltipElement(): HTMLDivElement {
 
 describe('HelpTooltip', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     document.body.innerHTML = ''
   })
 
@@ -25,17 +27,15 @@ describe('HelpTooltip', () => {
     })
 
     const trigger = wrapper.get('.group')
-    const tooltip = getTooltipElement()
-
-    expect(tooltip.style.display).toBe('none')
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
 
     await trigger.trigger('mouseenter')
     await nextTick()
-    expect(tooltip.style.display).not.toBe('none')
+    expect(getTooltipElement().textContent).toContain('hover details')
 
     await trigger.trigger('mouseleave')
     await nextTick()
-    expect(tooltip.style.display).toBe('none')
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
 
     wrapper.unmount()
   })
@@ -49,10 +49,9 @@ describe('HelpTooltip', () => {
     })
 
     const trigger = wrapper.get('.group')
-    const tooltip = getTooltipElement()
-
     await trigger.trigger('mouseenter')
     await nextTick()
+    const tooltip = getTooltipElement()
     expect(tooltip.style.display).not.toBe('none')
 
     await trigger.trigger('mouseleave', { relatedTarget: tooltip })
@@ -65,7 +64,7 @@ describe('HelpTooltip', () => {
 
     tooltip.dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: null }))
     await nextTick()
-    expect(tooltip.style.display).toBe('none')
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
 
     wrapper.unmount()
   })
@@ -80,12 +79,11 @@ describe('HelpTooltip', () => {
     })
 
     const trigger = wrapper.get('.group')
-    const tooltip = getTooltipElement()
-
-    expect(tooltip.style.display).toBe('none')
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
 
     await trigger.trigger('click')
     await nextTick()
+    const tooltip = getTooltipElement()
     expect(tooltip.style.display).not.toBe('none')
     expect(tooltip.textContent).toContain('click details')
 
@@ -95,16 +93,36 @@ describe('HelpTooltip', () => {
     }
     closeButton.click()
     await nextTick()
-    expect(tooltip.style.display).toBe('none')
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
 
     await trigger.trigger('click')
     await nextTick()
-    expect(tooltip.style.display).not.toBe('none')
+    expect(getTooltipElement().textContent).toContain('click details')
 
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await nextTick()
-    expect(tooltip.style.display).toBe('none')
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
 
+    wrapper.unmount()
+  })
+
+  it('keeps a scrolled tooltip inside the viewport and closes with Escape', async () => {
+    const wrapper = mount(HelpTooltip, { attachTo: document.body, props: { content: 'details', trigger: 'click' } })
+    const trigger = wrapper.get('.group')
+    await trigger.trigger('click')
+    const tooltip = getTooltipElement()
+    vi.stubGlobal('scrollY', 700)
+    vi.stubGlobal('innerWidth', 1024)
+    vi.stubGlobal('innerHeight', 768)
+    vi.spyOn(trigger.element, 'getBoundingClientRect').mockReturnValue({ top: 5, bottom: 25, left: 990, width: 20 } as DOMRect)
+    vi.spyOn(tooltip, 'getBoundingClientRect').mockReturnValue({ width: 320, height: 100 } as DOMRect)
+    window.dispatchEvent(new Event('scroll'))
+    await nextTick()
+    expect(tooltip.style.top).toBe('33px')
+    expect(tooltip.style.left).toBe('696px')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull()
     wrapper.unmount()
   })
 })

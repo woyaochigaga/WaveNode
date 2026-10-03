@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef, nextTick } from 'vue'
+import { onBeforeUnmount, ref, useTemplateRef, nextTick, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   content?: string
@@ -14,6 +14,8 @@ const show = ref(false)
 const triggerRef = useTemplateRef<HTMLElement>('trigger')
 const tooltipRef = useTemplateRef<HTMLElement>('tooltip')
 const tooltipStyle = ref({ top: '0px', left: '0px' })
+// 记录弹层方向，让悬停时的透明连接区始终朝向触发按钮。
+const below = ref(false)
 
 function openTooltip() {
   show.value = true
@@ -80,29 +82,40 @@ function updatePosition() {
   const el = triggerRef.value
   if (!el) return
   const rect = el.getBoundingClientRect()
+  const tooltip = tooltipRef.value?.getBoundingClientRect()
+  if (!tooltip) return
+  const gap = 8
+  below.value = rect.top < tooltip.height + gap * 2
+  // fixed 使用视口坐标；滚动时不能叠加页面偏移，窄屏时限制在可见区域内。
   tooltipStyle.value = {
-    top: `${rect.top + window.scrollY}px`,
-    left: `${rect.left + rect.width / 2 + window.scrollX}px`,
+    top: `${Math.max(gap, Math.min(below.value ? rect.bottom + gap : rect.top - tooltip.height - gap, window.innerHeight - tooltip.height - gap))}px`,
+    left: `${Math.max(gap, Math.min(rect.left + rect.width / 2 - tooltip.width / 2, window.innerWidth - tooltip.width - gap))}px`,
   }
 }
 
-onMounted(() => {
+function removeListeners() {
+  document.removeEventListener('click', onDocumentClick, true)
+  document.removeEventListener('keydown', onDocumentKeydown)
+  window.removeEventListener('resize', onViewportChange)
+  window.removeEventListener('scroll', onViewportChange, true)
+}
+
+// 设置页有大量问号，只有已打开的提示框需要监听全局事件。
+watch(show, (visible) => {
+  if (!visible) {
+    removeListeners()
+    return
+  }
   document.addEventListener('click', onDocumentClick, true)
   document.addEventListener('keydown', onDocumentKeydown)
   window.addEventListener('resize', onViewportChange)
   window.addEventListener('scroll', onViewportChange, true)
 })
-
-onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocumentClick, true)
-  document.removeEventListener('keydown', onDocumentKeydown)
-  window.removeEventListener('resize', onViewportChange)
-  window.removeEventListener('scroll', onViewportChange, true)
-})
+onBeforeUnmount(removeListeners)
 </script>
 
 <template>
-  <div
+  <span
     ref="trigger"
     class="group relative ml-1 inline-flex items-center align-middle"
     @mouseenter="onEnter"
@@ -110,7 +123,7 @@ onBeforeUnmount(() => {
     @click="onClick"
   >
     <!-- Trigger Icon -->
-    <slot name="trigger">
+    <slot name="trigger" :open="show">
       <svg
         class="h-4 w-4 cursor-help text-gray-400 transition-colors hover:text-primary-600 dark:text-gray-500 dark:hover:text-primary-400"
         fill="none"
@@ -131,13 +144,14 @@ onBeforeUnmount(() => {
       <!-- before: 伪元素向下延伸一段透明区域，盖住提示框与触发图标之间的空隙，让指针能连续移入提示框。 -->
       <div
         ref="tooltip"
-        v-show="show"
+        v-if="show"
         role="tooltip"
         :class="[
-          'fixed z-[99999] -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 p-3 text-xs leading-relaxed text-white shadow-xl ring-1 ring-white/10 selection:bg-primary-200 selection:text-gray-900 before:absolute before:inset-x-0 before:top-full before:h-3 dark:bg-gray-800 dark:selection:bg-primary-200 dark:selection:text-gray-900',
+          'fixed z-[99999] max-w-[calc(100vw-16px)] rounded-lg bg-gray-900 p-3 text-xs leading-relaxed text-white shadow-xl ring-1 ring-white/10 selection:bg-primary-200 selection:text-gray-900 before:absolute before:inset-x-0 before:h-3 dark:bg-gray-800 dark:selection:bg-primary-200 dark:selection:text-gray-900',
+          below ? 'before:bottom-full' : 'before:top-full',
           props.widthClass,
         ]"
-        :style="{ top: `calc(${tooltipStyle.top} - 8px)`, left: tooltipStyle.left }"
+        :style="tooltipStyle"
         @mouseleave="onTooltipLeave"
       >
         <button
@@ -151,9 +165,10 @@ onBeforeUnmount(() => {
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        <slot>{{ content }}</slot>
-        <div class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900 dark:bg-gray-800"></div>
+        <div class="max-h-[calc(100vh-40px)] overflow-y-auto" :class="props.trigger === 'click' && 'pr-5'">
+          <slot>{{ content }}</slot>
+        </div>
       </div>
     </Teleport>
-  </div>
+  </span>
 </template>

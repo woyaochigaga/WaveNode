@@ -10,14 +10,14 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="input-label">
-            {{ t('admin.settings.payment.providerName') }}
+            {{ t('admin.settings.payment.providerName') }} <SettingHelp :title="t('admin.settings.payment.providerName')">{{ t('admin.settings.fieldHelp.payment_providerName') }}</SettingHelp>
             <span class="text-red-500">*</span>
           </label>
           <input v-model="form.name" type="text" class="input" required />
         </div>
         <div>
           <label class="input-label">
-            {{ t('admin.settings.payment.providerKey') }}
+            {{ t('admin.settings.payment.providerKey') }} <SettingHelp :title="t('admin.settings.payment.providerKey')">{{ t('admin.settings.fieldHelp.payment_providerKey') }}</SettingHelp>
             <span class="text-red-500">*</span>
           </label>
           <Select
@@ -31,11 +31,11 @@
 
       <!-- Toggles + Payment mode + Supported types (single row) -->
       <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <ToggleSwitch :label="t('common.enabled')" :checked="form.enabled" @toggle="form.enabled = !form.enabled" />
-        <ToggleSwitch :label="t('admin.settings.payment.refundEnabled')" :checked="form.refund_enabled" @toggle="form.refund_enabled = !form.refund_enabled; if (!form.refund_enabled) form.allow_user_refund = false" />
-        <ToggleSwitch v-if="form.refund_enabled" :label="t('admin.settings.payment.allowUserRefund')" :checked="form.allow_user_refund" @toggle="form.allow_user_refund = !form.allow_user_refund" />
+        <ToggleSwitch :label="t('common.enabled')" :help="t('admin.settings.fieldHelp.providerEnabled')" :checked="form.enabled" @toggle="form.enabled = !form.enabled" />
+        <ToggleSwitch :label="t('admin.settings.payment.refundEnabled')" :help="t('admin.settings.fieldHelp.providerRefund')" :checked="form.refund_enabled" @toggle="form.refund_enabled = !form.refund_enabled; if (!form.refund_enabled) form.allow_user_refund = false" />
+        <ToggleSwitch v-if="form.refund_enabled" :label="t('admin.settings.payment.allowUserRefund')" :help="t('admin.settings.fieldHelp.providerUserRefund')" :checked="form.allow_user_refund" @toggle="form.allow_user_refund = !form.allow_user_refund" />
         <div v-if="supportsPaymentMode" class="flex items-center gap-2">
-          <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.paymentMode') }}</span>
+          <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.paymentMode') }} <SettingHelp :title="t('admin.settings.payment.paymentMode')">{{ t('admin.settings.fieldHelp.providerMode') }}</SettingHelp></span>
           <div class="flex gap-1.5">
             <button
               v-for="mode in paymentModeOptions"
@@ -52,7 +52,7 @@
           </div>
         </div>
         <div v-if="availableTypes.length > 1" class="flex items-center gap-2">
-          <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.supportedTypes') }}</span>
+          <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.supportedTypes') }} <SettingHelp :title="t('admin.settings.payment.supportedTypes')">{{ t('admin.settings.fieldHelp.providerTypes') }}</SettingHelp></span>
           <div class="flex flex-wrap gap-1.5">
             <button
               v-for="pt in availableTypes"
@@ -91,15 +91,15 @@
             class="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2"
           >
             <div>
-              <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.customMethodType') }}</label>
+              <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.customMethodType') }} <SettingHelp :title="t('admin.settings.payment.customMethodType')">{{ t('admin.settings.fieldHelp.payment_customMethodType') }}</SettingHelp></label>
               <input v-model="method.type" type="text" class="input mt-0.5" placeholder="credit_card" />
             </div>
             <div>
-              <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.customMethodUpstreamType') }}</label>
+              <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.customMethodUpstreamType') }} <SettingHelp :title="t('admin.settings.payment.customMethodUpstreamType')">{{ t('admin.settings.fieldHelp.payment_customMethodUpstreamType') }}</SettingHelp></label>
               <input v-model="method.upstreamType" type="text" class="input mt-0.5" placeholder="credit_card" />
             </div>
             <div>
-              <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.customMethodDisplayName') }}</label>
+              <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.customMethodDisplayName') }} <SettingHelp :title="t('admin.settings.payment.customMethodDisplayName')">{{ t('admin.settings.fieldHelp.payment_customMethodDisplayName') }}</SettingHelp></label>
               <input v-model="method.displayName" type="text" class="input mt-0.5" :placeholder="t('admin.settings.payment.customMethodDisplayNamePlaceholder')" />
             </div>
             <button
@@ -155,7 +155,7 @@
         <div class="space-y-3">
           <div v-for="field in resolvedFields" :key="field.key">
             <label class="input-label">
-              {{ field.label }}
+              {{ field.label }} <SettingHelp :title="field.label">{{ field.hintKey ? t(field.hintKey) : t(`admin.settings.fieldHelp.provider_${field.key}`) }}</SettingHelp>
               <span v-if="field.optional" class="text-xs text-gray-400">({{ t('common.optional') }})</span>
               <span v-else class="text-red-500"> *</span>
             </label>
@@ -214,14 +214,14 @@
         <!-- Callback URLs (each = editable URL + fixed path) -->
         <div v-if="callbackPaths" class="mt-4 space-y-3">
           <div v-if="callbackPaths.notifyUrl">
-            <label class="input-label">{{ t('admin.settings.payment.field_notifyUrl') }} <span class="text-red-500">*</span></label>
+            <label class="input-label">{{ t('admin.settings.payment.field_notifyUrl') }} <SettingHelp :title="t('admin.settings.payment.field_notifyUrl')">{{ t('admin.settings.fieldHelp.payment_field_notifyUrl') }}</SettingHelp> <span class="text-red-500">*</span></label>
             <div class="flex">
               <input v-model="notifyBaseUrl" type="text" class="input min-w-0 flex-1 !rounded-r-none !border-r-0" :placeholder="defaultBaseUrl" />
               <span class="inline-flex items-center whitespace-nowrap rounded-r-lg border border-gray-300 bg-gray-50 px-3 text-xs text-gray-500 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-400">{{ callbackPaths.notifyUrl }}</span>
             </div>
           </div>
           <div v-if="callbackPaths.returnUrl">
-            <label class="input-label">{{ t('admin.settings.payment.field_returnUrl') }} <span class="text-red-500">*</span></label>
+            <label class="input-label">{{ t('admin.settings.payment.field_returnUrl') }} <SettingHelp :title="t('admin.settings.payment.field_returnUrl')">{{ t('admin.settings.fieldHelp.payment_field_returnUrl') }}</SettingHelp> <span class="text-red-500">*</span></label>
             <div class="flex">
               <input v-model="returnBaseUrl" type="text" class="input min-w-0 flex-1 !rounded-r-none !border-r-0" :placeholder="defaultBaseUrl" />
               <span class="inline-flex items-center whitespace-nowrap rounded-r-lg border border-gray-300 bg-gray-50 px-3 text-xs text-gray-500 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-400">{{ callbackPaths.returnUrl }}</span>
@@ -260,7 +260,7 @@
             <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">{{ lt.label }}</p>
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.limitSingleMin') }}</label>
+                <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.limitSingleMin') }} <SettingHelp :title="t('admin.settings.payment.limitSingleMin')">{{ t('admin.settings.fieldHelp.payment_limitSingleMin') }}</SettingHelp></label>
                 <input
                   type="number"
                   :value="getLimitVal(lt.value, 'singleMin')"
@@ -269,7 +269,7 @@
                 />
               </div>
               <div>
-                <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.limitSingleMax') }}</label>
+                <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.limitSingleMax') }} <SettingHelp :title="t('admin.settings.payment.limitSingleMax')">{{ t('admin.settings.fieldHelp.payment_limitSingleMax') }}</SettingHelp></label>
                 <input
                   type="number"
                   :value="getLimitVal(lt.value, 'singleMax')"
@@ -278,7 +278,7 @@
                 />
               </div>
               <div>
-                <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.limitDaily') }}</label>
+                <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.payment.limitDaily') }} <SettingHelp :title="t('admin.settings.payment.limitDaily')">{{ t('admin.settings.fieldHelp.payment_limitDaily') }}</SettingHelp></label>
                 <input
                   type="number"
                   :value="getLimitVal(lt.value, 'dailyLimit')"
@@ -305,6 +305,7 @@
 </template>
 
 <script setup lang="ts">
+import SettingHelp from "@/components/admin/SettingHelp.vue";
 import { reactive, computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
