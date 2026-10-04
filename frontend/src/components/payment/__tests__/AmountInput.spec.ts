@@ -10,6 +10,12 @@ function mountInput(value: number | null = null) {
 }
 
 describe('recharge amount input', () => {
+  it('shows the selected gateway currency instead of a fixed dollar symbol', () => {
+    const wrapper = mount(AmountInput, { props: { modelValue: null, currency: 'CNY' } })
+    expect(wrapper.text()).toContain('¥')
+    expect(wrapper.text()).not.toContain('$')
+  })
+
   it.each(['10abc', '10.555', '-10', '1e2'])('restores the accepted amount after rejecting %s', async (value) => {
     const wrapper = mountInput(10)
     const input = wrapper.get('input')

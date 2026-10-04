@@ -58,7 +58,7 @@
             ({{ row.fee_rate }}%)
           </span>
           <div v-if="row.amount !== row.pay_amount" class="text-xs text-gray-500">
-            {{ t('payment.orders.creditedAmount') }}: {{ creditedAmountSymbol }}{{ row.amount.toFixed(2) }}
+            {{ t('payment.orders.creditedAmount') }}: {{ t('payment.pointsAmount', { amount: formatPoints(row.amount) }) }}
           </div>
         </div>
       </template>
@@ -144,6 +144,7 @@ import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { statusBadgeClass, canRefund, formatOrderDateTime } from '@/components/payment/orderUtils'
 import { currencySymbol } from '@/components/payment/currency'
+import { formatPoints } from '@/utils/points'
 
 const { t } = useI18n()
 
@@ -168,8 +169,6 @@ const emit = defineEmits<{
 
 const searchQuery = ref('')
 const filters = reactive({ status: '', payment_type: '', order_type: '' })
-const creditedAmountSymbol = currencySymbol('USD')
-
 function paymentAmountSymbol(order: PaymentOrder): string {
   return currencySymbol(order.currency)
 }

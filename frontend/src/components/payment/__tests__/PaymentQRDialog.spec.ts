@@ -13,7 +13,7 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key,
+      t: (key: string, params?: { amount?: string }) => key === 'payment.pointsAmount' ? `${params?.amount} points` : key,
     }),
   }
 })
@@ -73,7 +73,7 @@ describe('PaymentQRDialog currency display', () => {
     vi.useRealTimers()
   })
 
-  it('uses order currency for pay_amount and USD for credited amount', async () => {
+  it('uses order currency for pay_amount and points for credited amount', async () => {
     const wrapper = mount(PaymentQRDialog, {
       props: {
         show: false,
@@ -99,7 +99,7 @@ describe('PaymentQRDialog currency display', () => {
     await flushPromises()
 
     expect(pollOrderStatus).toHaveBeenCalledWith(42)
-    expect(wrapper.text()).toContain('$100.00')
+    expect(wrapper.text()).toContain('100.00 points')
     expect(wrapper.text()).toContain('¥108.00')
   })
 })
