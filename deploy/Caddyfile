@@ -8,8 +8,9 @@
 	}
 }
 
-# 修改为你的域名
-api.sub2api.com {
+# WaveNode production domains. The Docker image embeds the frontend and serves
+# both the web UI and API from the backend listener on port 8080.
+wavenode.org, www.wavenode.org, api.wavenode.org {
 	# This baseline assumes clients connect directly to Caddy. When Caddy is
 	# behind a CDN, configure explicit trusted proxy CIDRs and {client_ip} as
 	# documented in EDGE_SECURITY.md; {remote_host} would otherwise be the CDN.
@@ -27,7 +28,7 @@ api.sub2api.com {
 	# =========================================================================
 	# 反向代理配置
 	# =========================================================================
-	reverse_proxy localhost:8080 {
+	reverse_proxy 127.0.0.1:8080 {
 		# 健康检查
 		health_uri /health
 		health_interval 30s

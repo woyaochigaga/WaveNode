@@ -60,8 +60,8 @@ export default {
 
   // Recharge / Subscription Page
   purchase: {
-    title: '充值/订阅',
-    description: '通过内嵌页面完成充值/订阅',
+    title: '充值/订阅/兑换',
+    description: '充值积分、购买订阅或使用兑换码',
     rechargeDescription: '通过内嵌页面完成充值',
     subscriptionDescription: '通过内嵌页面完成订阅',
     openInNewTab: '新窗口打开',

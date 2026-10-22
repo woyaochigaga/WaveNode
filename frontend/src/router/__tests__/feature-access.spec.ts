@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RouterOptions } from 'vue-router'
 
 type NavigationGuard = (
   to: Record<string, any>,
@@ -8,6 +9,7 @@ type NavigationGuard = (
 
 const routerHarness = vi.hoisted(() => ({
   guard: null as NavigationGuard | null,
+  routes: [] as RouterOptions['routes'],
 }))
 
 const authStore = vi.hoisted(() => ({
@@ -33,13 +35,16 @@ const appStore = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   createWebHistory: vi.fn(() => ({})),
-  createRouter: vi.fn(() => ({
+  createRouter: vi.fn((options: RouterOptions) => {
+    routerHarness.routes = options.routes
+    return {
     beforeEach: vi.fn((guard: NavigationGuard) => {
       routerHarness.guard = guard
     }),
     afterEach: vi.fn(),
     onError: vi.fn(),
-  })),
+    }
+  }),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -110,6 +115,35 @@ describe('feature route guard', () => {
     appStore.publicSettingsLoaded = false
     appStore.cachedPublicSettings = null
     appStore.fetchPublicSettings.mockReset()
+  })
+
+  it('redirects the legacy redeem URL to its tab and keeps query parameters', () => {
+    const legacy = routerHarness.routes.find(route => route.path === '/redeem')!
+    expect(typeof legacy.redirect).toBe('function')
+    const redirect = legacy.redirect as (route: unknown) => unknown
+    expect(redirect({ query: { from: 'bookmark' }, hash: '' })).toEqual({
+      path: '/purchase', query: { from: 'bookmark', tab: 'redeem' }, hash: '',
+    })
+  })
+
+  it('allows the combined page with online payment disabled after loading settings', async () => {
+    appStore.fetchPublicSettings.mockImplementation(async () => {
+      appStore.cachedPublicSettings = { payment_enabled: false }
+      appStore.publicSettingsLoaded = true
+    })
+    const purchase = routerHarness.routes.find(route => route.path === '/purchase')!
+    const { navigation, next } = runGuard(purchase.meta!, '/purchase')
+    await navigation
+    expect(appStore.fetchPublicSettings).toHaveBeenCalledOnce()
+    expect(next).toHaveBeenCalledWith()
+  })
+
+  it('preserves simple-mode restrictions for the merged redemption entry', async () => {
+    authStore.isSimpleMode = true
+    const purchase = routerHarness.routes.find(route => route.path === '/purchase')!
+    const { navigation, next } = runGuard(purchase.meta!, '/purchase')
+    await navigation
+    expect(next).toHaveBeenCalledWith('/dashboard')
   })
 
   it('waits for the first public-settings request before deciding payment access', async () => {

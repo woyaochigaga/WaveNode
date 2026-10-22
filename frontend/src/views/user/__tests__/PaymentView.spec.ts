@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
+import RedeemView from '../RedeemView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
 import AmountInput from '@/components/payment/AmountInput.vue'
@@ -829,34 +830,34 @@ describe('PaymentView subscription feature flag', () => {
     return wrapper
       .findAll('button')
       .map((button) => button.text())
-      .filter((text) => text === 'payment.tabTopUp' || text === 'payment.tabSubscribe')
+      .filter((text) => ['payment.tabTopUp', 'payment.tabSubscribe', 'nav.redeem'].includes(text))
   }
 
   it('keeps the top-up / subscribe switcher when subscription_enabled is absent (opt-out default)', async () => {
     const wrapper = await mountSubscriptionPlanList(2)
 
-    expect(tabLabels(wrapper)).toEqual(['payment.tabTopUp', 'payment.tabSubscribe'])
+    expect(tabLabels(wrapper)).toEqual(['payment.tabTopUp', 'payment.tabSubscribe', 'nav.redeem'])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(2)
   })
 
-  it('drops the subscribe tab, hides the switcher and ignores ?tab=subscription when subscriptions are disabled', async () => {
+  it('keeps recharge and redemption when subscriptions are disabled', async () => {
     appStoreState.setPublicSettings({ subscription_enabled: false })
     const wrapper = await mountSubscriptionPlanList(2)
 
-    expect(tabLabels(wrapper)).toEqual([])
+    expect(tabLabels(wrapper)).toEqual(['payment.tabTopUp', 'nav.redeem'])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
     expect(wrapper.text()).toContain('payment.rechargeAccount')
   })
 
-  it('shows an unavailable notice instead of a doomed top-up form when balance recharge is disabled too', async () => {
+  it('shows redemption when both recharge and subscriptions are disabled', async () => {
     appStoreState.setPublicSettings({ subscription_enabled: false })
     const wrapper = await mountSubscriptionConfirm({ checkout: { balance_disabled: true } })
 
-    expect(tabLabels(wrapper)).toEqual([])
+    expect(tabLabels(wrapper)).toEqual(['nav.redeem'])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
     expect(wrapper.text()).not.toContain('payment.confirmSubscription')
     expect(wrapper.text()).not.toContain('payment.rechargeAccount')
-    expect(wrapper.text()).toContain('payment.billingUnavailable')
+    expect(wrapper.findComponent(RedeemView).props('embedded')).toBe(true)
     wrapper.unmount()
   })
 
@@ -867,7 +868,7 @@ describe('PaymentView subscription feature flag', () => {
     appStoreState.setPublicSettings({ subscription_enabled: false })
     await flushPromises()
 
-    expect(tabLabels(wrapper)).toEqual([])
+    expect(tabLabels(wrapper)).toEqual(['payment.tabTopUp', 'nav.redeem'])
     expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
     expect(wrapper.text()).toContain('payment.rechargeAccount')
     wrapper.unmount()
@@ -876,7 +877,7 @@ describe('PaymentView subscription feature flag', () => {
   it('enters the subscribe tab when a subscription-only site turns subscriptions back on', async () => {
     appStoreState.setPublicSettings({ subscription_enabled: false })
     const wrapper = await mountSubscriptionConfirm({ checkout: { balance_disabled: true } })
-    expect(wrapper.text()).toContain('payment.billingUnavailable')
+    expect(wrapper.findComponent(RedeemView).exists()).toBe(true)
 
     appStoreState.setPublicSettings({ subscription_enabled: true })
     await flushPromises()
@@ -885,5 +886,45 @@ describe('PaymentView subscription feature flag', () => {
     expect(wrapper.text()).not.toContain('payment.rechargeAccount')
     expect(wrapper.findAllComponents(SubscriptionPlanCard).length).toBeGreaterThan(0)
     wrapper.unmount()
+  })
+
+  it('keeps redemption available without requesting checkout when online payment is off', async () => {
+    appStoreState.setPublicSettings({ payment_enabled: false })
+    const wrapper = await mountSubscriptionPlanList(0)
+    expect(getCheckoutInfo).not.toHaveBeenCalled()
+    expect(tabLabels(wrapper)).toEqual(['nav.redeem'])
+    expect(wrapper.findComponent(RedeemView).props('embedded')).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('writes the selected tab to the URL and removes stale renewal context', async () => {
+    const wrapper = await mountSubscriptionPlanList(2)
+    routeState.query.group = '3'
+    await wrapper.get('#purchase-tab-redeem').trigger('click')
+    expect(routerReplace).toHaveBeenLastCalledWith({ query: { tab: 'redeem' } })
+    expect(wrapper.findComponent(RedeemView).exists()).toBe(true)
+    expect(wrapper.findAllComponents(SubscriptionPlanCard)).toHaveLength(0)
+    await wrapper.get('#purchase-tab-recharge').trigger('click')
+    expect(routerReplace).toHaveBeenLastCalledWith({ query: { tab: 'recharge' } })
+    expect(wrapper.text()).toContain('payment.rechargeAccount')
+    wrapper.unmount()
+  })
+
+  it('opens redemption from the URL even if checkout fails and an old payment exists', async () => {
+    routeState.query = { tab: 'redeem' }
+    getCheckoutInfo.mockRejectedValueOnce(new Error('checkout unavailable'))
+    window.localStorage.setItem(PAYMENT_RECOVERY_STORAGE_KEY, JSON.stringify({
+      orderId: 123, amount: 1, payAmount: 1, qrCode: 'old-order',
+      expiresAt: '2099-01-01T00:00:00Z', paymentType: 'wxpay', orderType: 'balance',
+    }))
+    const wrapper = shallowMount(PaymentView, {
+      global: { stubs: { AppLayout: { template: '<div><slot /></div>' }, Teleport: true } },
+    })
+    await flushPromises()
+    expect(wrapper.findComponent(RedeemView).exists()).toBe(true)
+    expect(wrapper.get('#purchase-tab-redeem').attributes('aria-selected')).toBe('true')
+    expect(wrapper.findComponent({ name: 'PaymentStatusPanel' }).exists()).toBe(false)
+    wrapper.unmount()
+    window.localStorage.clear()
   })
 })

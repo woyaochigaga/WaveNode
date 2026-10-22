@@ -6,7 +6,7 @@ vi.mock('@/i18n', () => {
   const messages: Record<string, string> = {
     'nav.recharge': '充值',
     'nav.subscribe': '订阅',
-    'nav.buySubscription': '充值/订阅',
+    'nav.buySubscription': '充值/订阅/兑换',
   }
   return { i18n: { global: { t: (key: string) => messages[key] ?? key } } }
 })
@@ -75,17 +75,17 @@ describe('resolveRouteMetaKeys', () => {
     })
   })
 
-  it('仅充值时 /purchase 切换为纯充值文案', () => {
+  it('仅充值时合并页仍保留统一标题', () => {
     expect(resolveRouteMetaKeys(purchaseRoute, { billingMode: 'recharge_only' })).toEqual({
-      titleKey: 'nav.recharge',
-      descriptionKey: 'purchase.rechargeDescription'
+      titleKey: 'nav.buySubscription',
+      descriptionKey: 'purchase.description'
     })
   })
 
-  it('仅订阅时 /purchase 切换为纯订阅文案', () => {
+  it('仅订阅时合并页仍保留统一标题', () => {
     expect(resolveRouteMetaKeys(purchaseRoute, { billingMode: 'subscription_only' })).toEqual({
-      titleKey: 'nav.subscribe',
-      descriptionKey: 'purchase.subscriptionDescription'
+      titleKey: 'nav.buySubscription',
+      descriptionKey: 'purchase.description'
     })
   })
 
@@ -105,18 +105,18 @@ describe('resolveRouteDocumentTitle 站点类型', () => {
     meta: { title: 'Purchase Subscription', titleKey: 'nav.buySubscription' }
   }
 
-  it('仅充值时 document.title 不再带「订阅」', () => {
+  it('仅充值时 document.title 保留合并入口名称', () => {
     const title = resolveRouteDocumentTitle(purchaseRoute, 'EzouAPI', [], { billingMode: 'recharge_only' })
-    expect(title).toBe('充值 - EzouAPI')
+    expect(title).toBe('充值/订阅/兑换 - EzouAPI')
   })
 
-  it('仅订阅时 document.title 只剩「订阅」', () => {
+  it('仅订阅时 document.title 保留合并入口名称', () => {
     const title = resolveRouteDocumentTitle(purchaseRoute, 'EzouAPI', [], { billingMode: 'subscription_only' })
-    expect(title).toBe('订阅 - EzouAPI')
+    expect(title).toBe('充值/订阅/兑换 - EzouAPI')
   })
 
   it('充值 & 订阅时保留原标题', () => {
     const title = resolveRouteDocumentTitle(purchaseRoute, 'EzouAPI', [], { billingMode: 'recharge_and_subscription' })
-    expect(title).toBe('充值/订阅 - EzouAPI')
+    expect(title).toBe('充值/订阅/兑换 - EzouAPI')
   })
 })

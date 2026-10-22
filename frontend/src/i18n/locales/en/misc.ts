@@ -61,8 +61,8 @@ export default {
 
   // Recharge / Subscription Page
   purchase: {
-    title: 'Recharge / Subscription',
-    description: 'Recharge balance or purchase subscription via the embedded page',
+    title: 'Recharge / Subscription / Redeem',
+    description: 'Top up points, purchase a subscription, or redeem a code',
     rechargeDescription: 'Recharge balance via the embedded page',
     subscriptionDescription: 'Purchase subscription via the embedded page',
     openInNewTab: 'Open in new tab',

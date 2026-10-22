@@ -1,16 +1,18 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-4xl space-y-6">
-      <div v-if="loading" class="flex items-center justify-center py-20">
+      <div v-if="loading && activeTab !== 'redeem'" class="flex items-center justify-center py-20">
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
       <template v-else>
         <!-- Tab Switcher (hide during payment and subscription confirm) -->
-        <div v-if="tabs.length > 1 && paymentPhase === 'select' && !selectedPlan" class="flex space-x-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-800">
+        <div v-if="paymentPhase === 'select' && !selectedPlan" role="tablist" :aria-label="t('nav.buySubscription')" class="flex space-x-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-800">
           <button v-for="tab in tabs" :key="tab.key"
+            :id="`purchase-tab-${tab.key}`" type="button" role="tab"
+            :aria-selected="activeTab === tab.key" :aria-controls="`purchase-panel-${tab.key}`"
             class="flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all"
             :class="activeTab === tab.key ? 'bg-white text-gray-900 shadow dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
-            @click="activeTab = tab.key">{{ tab.label }}</button>
+            @click="selectTab(tab.key)">{{ tab.label }}</button>
         </div>
         <!-- Payment in progress (shared by recharge and subscription) -->
         <template v-if="paymentPhase === 'paying'">
@@ -32,11 +34,8 @@
           />
         </template>
         <!-- Tab content (select phase) -->
-        <template v-else>
-          <!-- Neither top-up nor subscriptions available (balance recharge disabled via API while subscriptions are off) -->
-          <div v-if="tabs.length === 0" class="card py-16 text-center">
-            <p class="text-gray-500 dark:text-gray-400">{{ t('payment.billingUnavailable') }}</p>
-          </div>
+        <div v-else :id="`purchase-panel-${activeTab}`" role="tabpanel" :aria-labelledby="`purchase-tab-${activeTab}`" class="space-y-6">
+          <RedeemView v-if="activeTab === 'redeem'" embedded />
           <!-- Top-up Tab -->
           <template v-else-if="activeTab === 'recharge'">
             <!-- Recharge Account Card -->
@@ -221,8 +220,8 @@
               </div>
             </template>
           </template>
-        </template>
-        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan" class="card p-4">
+        </div>
+        <div v-if="activeTab !== 'redeem' && (checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan" class="card p-4">
           <div class="flex flex-col items-center gap-3">
             <img v-if="checkout.help_image_url" :src="checkout.help_image_url" alt=""
               class="h-40 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-80"
@@ -278,6 +277,7 @@ import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
 import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import RedeemView from './RedeemView.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
 import { METHOD_ORDER, getPaymentPopupFeatures, isBuiltInAlipayMethod, isBuiltInWxpayMethod } from '@/components/payment/providerConfig'
@@ -332,7 +332,9 @@ const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 const errorHintMessage = ref('')
-const activeTab = ref<'recharge' | 'subscription'>('recharge')
+// 标签写入 URL，兼容旧兑换入口、刷新和浏览器前进后退。
+type PurchaseTab = 'recharge' | 'subscription' | 'redeem'
+const activeTab = ref<PurchaseTab>(route.query.tab === 'redeem' ? 'redeem' : 'recharge')
 const amount = ref<number | null>(null)
 const selectedMethod = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
@@ -519,25 +521,35 @@ const renderedHelpText = computed(() => DOMPurify.sanitize(
   marked.parse(checkout.value.help_text || '', { async: false, gfm: true, breaks: false }),
 ))
 
-// 订阅功能开关（public settings 的 subscription_enabled，opt-out）。关闭后购买页只保留充值：
-// 不再渲染「订阅」tab，只剩单个 tab 时顶部切换器也随之隐藏。
+// 只在明确关闭支付时隐藏在线购买；兑换不依赖支付服务商。
+const paymentEnabled = computed(() => appStore.cachedPublicSettings?.payment_enabled !== false)
 const subscriptionEnabled = computed(() => resolveFeatureFlag(appStore.cachedPublicSettings, FeatureFlags.subscription))
 
 const tabs = computed(() => {
-  const result: { key: 'recharge' | 'subscription'; label: string }[] = []
-  if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
-  if (subscriptionEnabled.value) result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
+  const result: { key: PurchaseTab; label: string }[] = []
+  if (paymentEnabled.value && !checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
+  if (paymentEnabled.value && subscriptionEnabled.value) result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
+  result.push({ key: 'redeem', label: t('nav.redeem') })
   return result
 })
 
-// tab 列表随 checkout（balance_disabled）与订阅开关变化。当前 tab 不在列表里时收敛到第一个可用 tab，
-// 两个方向都覆盖：关闭订阅 → 回到充值；仅订阅站点重新打开订阅 → 进入订阅。列表为空时模板展示不可用提示。
-watch(tabs, (available) => {
-  if (available.some((tab) => tab.key === activeTab.value)) return
-  const leavingSubscription = activeTab.value === 'subscription'
-  activeTab.value = available[0]?.key ?? 'recharge'
-  if (leavingSubscription) selectedPlan.value = null
-})
+// tab 是用户选中的功能，切换时移除仅用于续订的 group，避免刷新后误入确认页。
+function selectTab(tab: PurchaseTab) {
+  activeTab.value = tab
+  selectedPlan.value = null
+  const query = { ...route.query }
+  query.tab = tab
+  delete query.group
+  void router.replace({ query })
+}
+
+// 功能开关或浏览器历史改变时回退到可用标签；支付进行中不切换订单面板。
+watch([tabs, () => route.query.tab], ([available, requested]) => {
+  if (paymentPhase.value === 'paying') return
+  const next = available.find(tab => tab.key === requested)?.key ?? available[0]!.key
+  if (next !== activeTab.value) selectedPlan.value = null
+  activeTab.value = next
+}, { immediate: true })
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
@@ -1124,6 +1136,10 @@ async function resumeWechatPaymentFromQuery() {
 }
 
 onMounted(async () => {
+  if (!paymentEnabled.value) {
+    loading.value = false
+    return
+  }
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
@@ -1136,7 +1152,8 @@ onMounted(async () => {
       })
       selectedMethod.value = sorted[0]
     }
-    if (typeof window !== 'undefined') {
+    // 显式打开兑换时不恢复旧付款面板，避免旧订单遮挡兑换表单。
+    if (typeof window !== 'undefined' && route.query.tab !== 'redeem') {
       if (hasWechatResumeQuery(route.query)) {
         removeRecoverySnapshot()
       }

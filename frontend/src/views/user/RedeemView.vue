@@ -1,22 +1,16 @@
 <template>
-  <AppLayout>
-    <div class="mx-auto max-w-2xl space-y-6">
-      <!-- Current Balance Card -->
-      <div class="card overflow-hidden">
-        <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
-          <div
-            class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
-          >
-            <Icon name="creditCard" size="xl" class="text-white" />
-          </div>
-          <p class="text-sm font-medium text-primary-100">{{ t('redeem.currentBalance') }}</p>
-          <p class="mt-2 text-4xl font-bold text-white">
-            ${{ user?.balance?.toFixed(2) || '0.00' }}
-          </p>
-          <p class="mt-2 text-sm text-primary-100">
-            {{ t('redeem.concurrency') }}: {{ user?.concurrency || 0 }} {{ t('redeem.requests') }}
-          </p>
-        </div>
+  <component :is="embedded ? 'div' : AppLayout">
+    <div class="mx-auto space-y-6" :class="{ 'max-w-2xl': !embedded }">
+      <!-- 与充值标签共用紧凑的积分账户展示，减少兑换表单前的留白。 -->
+      <div class="card p-5">
+        <p class="text-xs font-medium text-gray-400 dark:text-gray-500">{{ t('payment.rechargeAccount') }}</p>
+        <p class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ user?.username || '' }}</p>
+        <p class="mt-0.5 text-sm font-medium text-green-600 dark:text-green-400">
+          {{ t('payment.currentBalance') }}: {{ t('payment.pointsAmount', { amount: formatPoints(user?.balance) }) }}
+        </p>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('redeem.concurrency') }}: {{ user?.concurrency || 0 }} {{ t('redeem.requests') }}
+        </p>
       </div>
 
       <!-- Redeem Form -->
@@ -99,7 +93,7 @@
                   <p>{{ redeemResult.message }}</p>
                   <div class="mt-3 space-y-1">
                     <p v-if="redeemResult.type === 'balance'" class="font-medium">
-                      {{ t('redeem.added') }}: ${{ redeemResult.value.toFixed(2) }}
+                      {{ t('redeem.added') }}: {{ t('payment.pointsAmount', { amount: formatPoints(redeemResult.value) }) }}
                     </p>
                     <p v-else-if="redeemResult.type === 'concurrency'" class="font-medium">
                       {{ t('redeem.added') }}: {{ redeemResult.value }}
@@ -116,7 +110,7 @@
                     </p>
                     <p v-if="redeemResult.new_balance !== undefined">
                       {{ t('redeem.newBalance') }}:
-                      <span class="font-semibold">${{ redeemResult.new_balance.toFixed(2) }}</span>
+                      <span class="font-semibold">{{ t('payment.pointsAmount', { amount: formatPoints(redeemResult.new_balance) }) }}</span>
                     </p>
                     <p v-if="redeemResult.new_concurrency !== undefined">
                       {{ t('redeem.newConcurrency') }}:
@@ -250,7 +244,7 @@
                   <!-- 余额类型图标 -->
                   <Icon
                     v-if="isBalanceType(item.type)"
-                    name="dollar"
+                    name="gift"
                     size="md"
                     :class="
                       item.value >= 0
@@ -362,7 +356,7 @@
         </div>
       </div>
     </div>
-  </AppLayout>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -375,6 +369,10 @@ import { redeemAPI, authAPI, type RedeemHistoryItem } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
+import { formatPoints } from '@/utils/points'
+
+// 合并页嵌入时复用兑换逻辑，只渲染内容，避免重复导航和页头。
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -437,7 +435,7 @@ const getHistoryItemTitle = (item: RedeemHistoryItem) => {
 const formatHistoryValue = (item: RedeemHistoryItem) => {
   if (isBalanceType(item.type)) {
     const sign = item.value >= 0 ? '+' : ''
-    return `${sign}$${item.value.toFixed(2)}`
+    return `${sign}${t('payment.pointsAmount', { amount: formatPoints(item.value) })}`
   } else if (isSubscriptionType(item.type)) {
     // 订阅类型显示有效天数和分组名称
     const days = item.validity_days || Math.round(item.value)

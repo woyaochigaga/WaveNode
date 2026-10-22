@@ -26,8 +26,7 @@ export function resolveDocumentTitle(routeTitle: unknown, siteName?: string, tit
 
 export interface RouteTitleOptions {
   /**
-   * 站点计费模式（见 utils/billingMode.ts）。/purchase 的标题与描述随之切换：
-   * 仅充值 → 「充值」，仅订阅 → 「订阅」，缺省/两者都有 → 「充值/订阅」。
+   * 保留现有调用方的计费模式参数；合并页标题固定，功能开关只控制页内标签。
    */
   billingMode?: SiteBillingMode
 }
@@ -42,20 +41,12 @@ export const PURCHASE_ROUTE_NAME = 'PurchaseSubscription'
 
 /**
  * 解析路由的 i18n 标题/描述 key。绝大多数路由直接取 meta；
- * /purchase 随站点计费模式切换文案，AppHeader 与 document.title 共用这一处判断。
+ * 合并页使用统一标题，AppHeader 与 document.title 共用路由文案。
  */
 export function resolveRouteMetaKeys(
   route: Pick<RouteLocationNormalizedLoaded, 'name' | 'meta'>,
-  options: RouteTitleOptions = {},
+  _options: RouteTitleOptions = {},
 ): RouteMetaKeys {
-  if (route.name === PURCHASE_ROUTE_NAME) {
-    if (options.billingMode === 'recharge_only') {
-      return { titleKey: 'nav.recharge', descriptionKey: 'purchase.rechargeDescription' }
-    }
-    if (options.billingMode === 'subscription_only') {
-      return { titleKey: 'nav.subscribe', descriptionKey: 'purchase.subscriptionDescription' }
-    }
-  }
   return {
     titleKey: typeof route.meta.titleKey === 'string' ? route.meta.titleKey : undefined,
     descriptionKey: typeof route.meta.descriptionKey === 'string' ? route.meta.descriptionKey : undefined,
