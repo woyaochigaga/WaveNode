@@ -1,0 +1,889 @@
+{
+ "url": "http://127.0.0.1:3000/home",
+ "at": "2026-10-24T09:29:39.675Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 6,
+   "filled": [
+    1,
+    0.98,
+    1,
+    1,
+    0.97,
+    1
+   ],
+   "motion": {
+    "elements": 28,
+    "css": 12,
+    "transitions": 15,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 5053,
+     "screens": 6,
+     "words": 243,
+     "img": 2,
+     "video": 0,
+     "canvas": 4,
+     "svg": 32,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "WaveNode API",
+     "words": 2,
+     "chars": 12,
+     "lines": 1,
+     "size": 36,
+     "vw": 9.2,
+     "font": "system-ui",
+     "weight": 700,
+     "tracking": -0.025,
+     "leading": 1.08,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.92,
+     "top": 134,
+     "gradientText": true,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "WaveNode API",
+     "words": 2,
+     "lines": 1,
+     "size": 36,
+     "font": "system-ui"
+    },
+    "headings": [
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 36,
+      "vw": 9.2,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": -0.025,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 134,
+      "gradientText": true,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "全球订阅价格",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 27.2,
+      "vw": 7,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.045,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.79,
+      "top": 947,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "¥107.42",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.69,
+      "top": 1242,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥118.16",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.69,
+      "top": 1867,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥175.67",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.69,
+      "top": 2493,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "Subscription to API Conversion Platform",
+      "words": 5,
+      "chars": 39,
+      "lines": 2,
+      "size": 24,
+      "vw": 6.2,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.33,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3071,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "已支持的 AI 模型",
+      "words": 3,
+      "chars": 10,
+      "lines": 1,
+      "size": 24,
+      "vw": 6.2,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.33,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3619,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 32,
+      "vw": 8.2,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.06,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.84,
+      "top": 4273,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 8,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "system-ui",
+       "share": 0.82,
+       "mono": false
+      },
+      {
+       "family": "ui-monospace",
+       "share": 0.18,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      18,
+      19,
+      24,
+      27,
+      32,
+      36,
+      48
+     ],
+     "sizeCount": 15,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "text": "107.42"
+     },
+     "monoShare": 0.18,
+     "monoProseShare": 0.18,
+     "monoFamilies": [
+      "ui-monospace"
+     ],
+     "monoSamples": [
+      "gateway / request.flow",
+      "live",
+      "REQUEST 01 / 01",
+      "$",
+      "curl",
+      "-X POST"
+     ],
+     "microLabels": 16,
+     "microLabelShare": 0.115,
+     "microSamples": [
+      "live",
+      "REQUEST 01 / 01",
+      "SECURE ROUTING",
+      "STREAM READY",
+      "STATUS 200",
+      "GLOBAL PRICE INDEX"
+     ],
+     "upperShare": 0.16,
+     "centerShare": 0.09,
+     "smallText": 15
+    },
+    "eyebrows": [
+     {
+      "text": "GLOBAL PRICE INDEX",
+      "above": "全球订阅价格",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 10.4,
+      "top": 919
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥107.42",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1197
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥118.16",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1822
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥175.67",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 2448
+     },
+     {
+      "text": "一键接入",
+      "above": "Subscription to API Conversion Platform",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 3047
+     },
+     {
+      "text": "已支持",
+      "above": "已支持的 AI 模型",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 3595
+     },
+     {
+      "text": "准备好开始了吗？",
+      "above": "WaveNode API",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 4242
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f9fafb",
+     "bodyBgHsl": {
+      "h": 210,
+      "s": 0.2,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#f8fafc",
+       "top": 0,
+       "hsl": {
+        "h": 210,
+        "s": 0.4,
+        "l": 0.98
+       }
+      },
+      {
+       "color": "#ffffff",
+       "top": 1040,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#64746e",
+       "share": 0.19
+      },
+      {
+       "color": "#12251e",
+       "share": 0.18
+      },
+      {
+       "color": "#64748b",
+       "share": 0.09
+      },
+      {
+       "color": "#4b5563",
+       "share": 0.07
+      },
+      {
+       "color": "#111827",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#0f766e",
+      "hsl": {
+       "h": 175,
+       "s": 0.77,
+       "l": 0.26
+      },
+      "fg": "#f0fdfa"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 10,
+     "height": 42,
+     "withShadow": 3,
+     "withGradient": 3,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "登录",
+      "立即开始"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 9,
+     "shadowOverlay": 2,
+     "shadowSamples": [
+      "a.specular-button.specular-button--lg → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 118, 110, 0.2) 0px 14p",
+      "div.terminal-window → rgba(15, 23, 42, 0.65) 0px 32px 90px -36px, rgba(255, 255, 255, 0.04) 0px 0px 0p",
+      "div.terminal-float.terminal-float--top → rgba(15, 23, 42, 0.12) 0px 12px 34px 0px",
+      "div.terminal-float.terminal-float--bottom → rgba(15, 23, 42, 0.12) 0px 12px 34px 0px"
+     ],
+     "gradients": 9,
+     "scrims": 2,
+     "gradientSamples": [
+      "div.home-landing.relative → radial-gradient(at 50% -12%, rgba(20, 184, 166, 0.12), rgba(0, 0, 0, 0) 54%), linear-gradient(rgba(255, 255, 2",
+      "div.hero-interaction-layer → radial-gradient(672px at 50% 28%, rgba(13, 148, 136, 0.16), rgba(0, 0, 0, 0) 62%), linear-gradient(rgba(14, 11",
+      "div.hero-grid → linear-gradient(rgba(15, 118, 110, 0.075) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(15, 118, 110",
+      "div.hero-cursor-light → radial-gradient(circle, rgba(20, 184, 166, 0.18), rgba(37, 99, 235, 0.07) 34%, rgba(0, 0, 0, 0) 68%)"
+     ],
+     "gradientText": 1,
+     "hairlines": 19,
+     "hairlineSamples": [
+      "div.terminal-header 354px",
+      "div.terminal-footer 357px",
+      "section.home-reveal.mt-14 358px",
+      "a.op-region-row 313px",
+      "a.op-region-row 313px"
+     ],
+     "outlinedBoxes": 8,
+     "dashed": 0,
+     "blurred": 11,
+     "roundedBoxes": 9,
+     "boxRadius": 14,
+     "squareMedia": 1,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": true,
+     "height": 62,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": []
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 5053,
+    "margins": {
+     "left": 16,
+     "right": 22
+    },
+    "sections": [
+     {
+      "sel": "div.hero-grid",
+      "tag": "div",
+      "top": 62,
+      "height": 4854,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-cursor-light",
+      "tag": "div",
+      "top": 1269,
+      "height": 304,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.home-aurora",
+      "tag": "div",
+      "top": -18,
+      "height": 544,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.hero-section.home-reveal",
+      "tag": "section",
+      "top": 102,
+      "height": 583,
+      "words": 41,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 36,
+       "tag": "h1"
+      },
+      "left": 33,
+      "right": 25,
+      "textLeft": 33,
+      "textRight": 25,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.home-reveal.mt-14",
+      "tag": "section",
+      "top": 741,
+      "height": 130,
+      "words": 4,
+      "media": 0,
+      "middle": 15,
+      "heading": null,
+      "left": 117,
+      "right": 75,
+      "textLeft": 117,
+      "textRight": 75,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#official-prices.op-section.!px-0",
+      "tag": "section",
+      "top": 919,
+      "height": 2064,
+      "words": 83,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "107.42",
+       "size": 48,
+       "tag": "span"
+      },
+      "left": 16,
+      "right": 22,
+      "textLeft": 16,
+      "textRight": 22,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#home-features.mt-16.scroll-mt-24",
+      "tag": "section",
+      "top": 3047,
+      "height": 484,
+      "words": 6,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Subscription to API Conversion Platform",
+       "size": 24,
+       "tag": "h2"
+      },
+      "left": 8,
+      "right": 8,
+      "textLeft": 16,
+      "textRight": 54,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.home-reveal.mt-16",
+      "tag": "section",
+      "top": 3595,
+      "height": 538,
+      "words": 16,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "已支持的 AI 模型",
+       "size": 24,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 203,
+      "textLeft": 16,
+      "textRight": 203,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-cta.home-reveal",
+      "tag": "section",
+      "top": 4197,
+      "height": 655,
+      "words": 21,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 13,
+      "right": 69,
+      "textLeft": 32,
+      "textRight": 69,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.relative.z-10",
+      "tag": "footer",
+      "top": 4916,
+      "height": 137,
+      "words": 6,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 88,
+      "right": 48,
+      "textLeft": 88,
+      "textRight": 48,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "WaveNode API",
+      "size": 36,
+      "top": 134,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 16,
+      "n": 3
+     },
+     {
+      "x": 88,
+      "n": 3
+     },
+     {
+      "x": 32,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 7,
+    "bodySize": 11,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "FAIL",
+   "id": "eyebrow",
+   "width": 390,
+   "message": "7 eyebrow/kicker label(s) above headings: \"GLOBAL PRICE INDEX\" above \"全球订阅价格\"; \"已收录地区最低价\" (pill) above \"¥107.42\"; \"已收录地区最低价\" (pill) above \"¥118.16\"; \"已收录地区最低价\" (pill) above \"¥175.67\"; \"一键接入\" above \"Subscription to API Conversion Platform\"",
+   "fix": "Delete them. If the label carried real information, fold it into the headline or the supporting sentence."
+  },
+  {
+   "level": "FAIL",
+   "id": "mono",
+   "width": 390,
+   "message": "Monospace type outside code: ui-monospace — e.g. \"gateway / request.flow\", \"live\", \"REQUEST 01 / 01\", \"$\"",
+   "fix": "Set it in the text face. Monospace is for literal code inside <pre>/<code> only."
+  },
+  {
+   "level": "FAIL",
+   "id": "micro-label",
+   "width": 390,
+   "message": "16 tiny uppercase letter-spaced labels (e.g. \"live\", \"REQUEST 01 / 01\", \"SECURE ROUTING\", \"STREAM READY\").",
+   "fix": "Use sentence-case text at a readable size, or delete the label."
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient",
+   "width": 390,
+   "message": "9 gradient fill(s): div.home-landing.relative → radial-gradient(at 50% -12%, rgba(20, 184, 166, 0.12), rgba(0, 0, 0, 0) 54%), linear-gradient(rgba(255, 255, 2 | div.hero-interaction-layer → radial-gradient(672px at 50% 28%, rgba(13, 148, 136, 0.16), rgba(0, 0, 0, 0) 62%), linear-gradient(rgba(14, 11 | div.hero-grid → linear-gradient(rgba(15, 118, 110, 0.075) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(15, 118, 110",
+   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility."
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient-text",
+   "width": 390,
+   "message": "1 gradient-filled text element(s).",
+   "fix": "Solid colour text."
+  },
+  {
+   "level": "FAIL",
+   "id": "shadow",
+   "width": 390,
+   "message": "9 box-shadow(s) on elements at rest: a.specular-button.specular-button--lg → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 118, 110, 0.2) 0px 14p | div.terminal-window → rgba(15, 23, 42, 0.65) 0px 32px 90px -36px, rgba(255, 255, 255, 0.04) 0px 0px 0p | div.terminal-float.terminal-float--top → rgba(15, 23, 42, 0.12) 0px 12px 34px 0px",
+   "fix": "Remove. Separate surfaces with a tone step or space. Shadows are for things that really float (menus, dialogs, sticky bars)."
+  },
+  {
+   "level": "FAIL",
+   "id": "button-fx",
+   "width": 390,
+   "message": "Buttons with gradient fill and shadow/glow.",
+   "fix": "Flat fill, one colour."
+  },
+  {
+   "level": "FAIL",
+   "id": "hairline",
+   "width": 390,
+   "message": "19 thin rule(s)/divider line(s): div.terminal-header 354px | div.terminal-footer 357px | section.home-reveal.mt-14 358px | a.op-region-row 313px",
+   "fix": "Delete. Separate with space, a tone change, or scale. Lines are only for real tables and form fields."
+  },
+  {
+   "level": "FAIL",
+   "id": "outlined-box",
+   "width": 390,
+   "message": "8 boxes drawn with a 1px outline.",
+   "fix": "Define a surface by its fill (one tone step from the page) or leave the content unboxed."
+  },
+  {
+   "level": "WARN",
+   "id": "glass",
+   "width": 390,
+   "message": "11 backdrop-blur surfaces.",
+   "fix": "One blurred sticky bar at most; glass cards are a tell."
+  },
+  {
+   "level": "WARN",
+   "id": "size-count",
+   "width": 390,
+   "message": "15 different font sizes (8, 9, 10, 11, 12, 13, 14, 16, 18, 19, 24, 27, 32, 36, 48).",
+   "fix": "A page needs about five: display, heading, lead, body, small."
+  },
+  {
+   "level": "FAIL",
+   "id": "small-text",
+   "width": 390,
+   "message": "15 text blocks under 13px.",
+   "fix": "Nothing meant to be read goes below 13px."
+  },
+  {
+   "level": "WARN",
+   "id": "name-only-title",
+   "width": 390,
+   "message": "The h1 is a bare name (\"WaveNode API\") and nothing else on the first screen says what this is.",
+   "fix": "Keep the name if it leads, and give the line under it (18px or more) the plain words: what it is, for whom, where or when. In the study of 97 Sites of the Day, first screens that named nothing lost usability and content points."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/mobile-after/mobile-fold.jpg",
+   "pages": [
+    "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/mobile-after/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

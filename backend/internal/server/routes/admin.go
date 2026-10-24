@@ -557,6 +557,11 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		adminSettings.GET("", h.Admin.Setting.GetSettings)
 		adminSettings.PUT("", h.Admin.Setting.UpdateSettings)
+		if h.OfficialPrices != nil {
+			adminSettings.GET("/official-prices", h.OfficialPrices.Status)
+			adminSettings.PUT("/official-prices", h.OfficialPrices.Save)
+			adminSettings.POST("/official-prices/refresh", h.OfficialPrices.Refresh)
+		}
 		adminSettings.POST("/test-smtp", h.Admin.Setting.TestSMTPConnection)
 		adminSettings.POST("/send-test-email", h.Admin.Setting.SendTestEmail)
 		adminSettings.GET("/email-templates", h.Admin.Setting.ListEmailTemplates)

@@ -162,6 +162,7 @@ export default {
         gateway: '网关服务',
         email: '邮件设置',
         backup: '数据备份',
+        officialPrices: '订阅价格',
         payment: '支付设置',
       },
       features: {

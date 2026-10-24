@@ -8,6 +8,7 @@
       allowfullscreen
     ></iframe>
     <div v-else v-html="homeContent"></div>
+    <HomeOfficialPrices />
   </div>
 
   <!-- 简洁首页仍由后台开关控制，继续保留既有展示与跳转。 -->
@@ -77,6 +78,7 @@
       </div>
     </main>
 
+    <HomeOfficialPrices />
     <footer class="min-w-0 border-t border-gray-200 px-4 py-4 text-sm text-gray-500 dark:border-dark-800 dark:text-dark-400 sm:px-6">
       <div class="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
         <span>&copy; {{ currentYear }} {{ siteName }}</span>
@@ -122,6 +124,7 @@ import Icon from '@/components/icons/Icon.vue'
 import HomeLandingHeader from '@/components/home/HomeLandingHeader.vue'
 import HomeLandingBody from '@/components/home/HomeLandingBody.vue'
 import HomeLandingFooter from '@/components/home/HomeLandingFooter.vue'
+import HomeOfficialPrices from '@/components/home/HomeOfficialPrices.vue'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 

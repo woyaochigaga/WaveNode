@@ -1,0 +1,36 @@
+export default {
+  officialPrices: {
+    title: 'Global subscription prices', eyebrow: 'GLOBAL PRICE INDEX',
+    subtitle: 'One subscription. A world of prices.',
+    description: 'Compare official App Store subscription prices across regions.',
+    lowest: 'Lowest among listed regions', lowestShort: 'Lowest price', domestic: 'Mainland China',
+    unavailable: 'Not listed', domesticHint: 'No mainland China price available',
+    regions: '{count} regions', allRegions: 'Explore all regions',
+    plan: 'Subscription plan', country: 'Country / region', original: 'Local price', converted: 'Price in CNY',
+    sourceUpdated: 'Updated', synced: 'Last synced',
+    lastUpdated: 'Last updated',
+    notice: 'App Store subscription prices. Exchange rates and prices may change; your local Apple bill is authoritative.',
+    search: 'Search countries / regions', backHome: 'Back to home',
+    ascending: 'Price: low to high', descending: 'Price: high to low', sort: 'Sort by price',
+    disabled: 'Subscription prices are not available', empty: 'No prices yet', noMatch: 'No matching regions',
+    emptyHint: 'Prices will appear after the next successful sync.',
+    loadError: 'Prices could not be loaded. Please try again.', retry: 'Try again',
+    comparedToLowest: 'Above lowest', sameLowest: 'Joint lowest', selectedRegion: 'Your selected region',
+    credits: 'Credits / top-ups',
+    admin: {
+      title: 'Official subscription prices', description: 'Manage price sync and select the products and regions shown on your homepage.',
+      enabled: 'Enable subscription prices', enabledHint: 'Enable automatic sync. Turning this off stops sync and hides public prices.',
+      homeEnabled: 'Show on homepage', homeHint: 'Show the lowest price, mainland China and selected regions. Open details for all regions.',
+      interval: 'Automatic refresh interval', hours: 'Every {count} hours', day: 'Daily', week: 'Weekly',
+      apps: 'Products to display', countries: 'Homepage regions', countriesHint: 'Choose up to 8. The lowest region and mainland China are always shown. Details include all regions.',
+      defaultOff: 'Disabled by default. Save with the feature enabled to start syncing.',
+      save: 'Save price settings', refresh: 'Refresh now', syncing: 'Syncing…',
+      lastSuccess: 'Last successful sync', nextRefresh: 'Next automatic sync', recordCount: 'Saved prices',
+      notSynced: 'Not synced yet', saved: 'Price settings saved', refreshed: 'Prices synced',
+      failed: 'The operation failed. Please try again.', lastError: 'The latest sync failed. Previous valid prices are retained.',
+      saveFirst: 'Save and enable this feature before refreshing.',
+      emptyApps: 'Select at least one product', maxCountries: 'Select up to 8 regions',
+      preview: 'View homepage', refreshStatus: 'Refresh status',
+    }
+  }
+}

@@ -1,0 +1,36 @@
+export default {
+  officialPrices: {
+    title: '全球订阅价格', eyebrow: 'GLOBAL PRICE INDEX',
+    subtitle: '同一个订阅，看看不同地区的价格（实时更新）。',
+    description: '对比 App Store 各地区的官方订阅报价，一览所有地区所有厂商的官方价格，找到适合你的选择！',
+    lowest: '已收录地区最低价', lowestShort: '最低价', domestic: '中国大陆',
+    unavailable: '暂无报价', domesticHint: '暂无中国大陆报价',
+    regions: '{count} 个地区', allRegions: '查看全部地区',
+    plan: '订阅套餐', country: '国家 / 地区', original: '当地原价', converted: '折合人民币',
+    sourceUpdated: '更新时间', synced: '最近同步',
+    lastUpdated: '上次更新时间',
+    notice: '展示 App Store 订阅报价。汇率及价格可能变化，实际金额以当地 Apple 账单为准。',
+    search: '搜索国家 / 地区', backHome: '返回首页',
+    ascending: '价格从低到高', descending: '价格从高到低', sort: '价格排序',
+    disabled: '订阅价格展示暂未开放', empty: '暂无价格数据', noMatch: '没有匹配的地区',
+    emptyHint: '价格同步后会自动显示，请稍后再来。',
+    loadError: '价格暂时无法加载，请稍后重试。', retry: '重新加载',
+    comparedToLowest: '较最低价', sameLowest: '并列最低', selectedRegion: '你选择的地区',
+    credits: '额度 / 充值',
+    admin: {
+      title: '官方订阅价格', description: '管理价格同步，以及首页展示的产品和代表地区。',
+      enabled: '启用订阅价格', enabledHint: '启用后自动同步价格；关闭后停止同步并关闭公开展示。',
+      homeEnabled: '在首页展示', homeHint: '首页展示最低价、中国大陆及所选地区，点击后查看全部地区。',
+      interval: '自动刷新周期', hours: '每 {count} 小时', day: '每天', week: '每周',
+      apps: '展示产品', countries: '首页代表地区', countriesHint: '最多选择 8 个。最低价地区与中国大陆始终展示；详情页保留全部地区。',
+      defaultOff: '功能默认关闭，保存启用后开始同步。',
+      save: '保存价格设置', refresh: '立即刷新', syncing: '正在同步…',
+      lastSuccess: '上次成功同步', nextRefresh: '下次自动同步', recordCount: '已保存报价',
+      notSynced: '尚未同步', saved: '价格设置已保存', refreshed: '价格同步完成',
+      failed: '操作失败，请稍后重试', lastError: '最近同步未成功，已保留上次有效报价。',
+      saveFirst: '请先保存并启用功能，再手动刷新。',
+      emptyApps: '请至少选择一个产品', maxCountries: '最多选择 8 个代表地区',
+      preview: '查看首页', refreshStatus: '刷新状态',
+    }
+  }
+}

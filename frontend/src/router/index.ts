@@ -185,6 +185,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
 
+  {
+    path: '/official-prices/:app',
+    name: 'OfficialPrices',
+    component: () => import('@/views/OfficialPricesView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Global subscription prices',
+      titleKey: 'officialPrices.title'
+    }
+  },
+
   // ==================== User Routes ====================
   {
     path: '/',

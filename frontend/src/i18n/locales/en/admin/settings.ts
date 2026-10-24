@@ -154,6 +154,7 @@ export default {
       title: 'System Settings',
       description: 'Manage site, authentication, gateway, payment, email and backup settings by category',
       tabs: {
+        officialPrices: 'Subscription prices',
         general: 'General',
         agreement: 'Agreement',
         features: 'Feature Switches',

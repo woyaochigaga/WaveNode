@@ -1,0 +1,2536 @@
+{
+ "url": "http://127.0.0.1:3000/home",
+ "at": "2026-10-24T09:01:23.171Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 4,
+   "filled": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 31,
+    "css": 15,
+    "transitions": 15,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 3299,
+     "screens": 3.7,
+     "words": 247,
+     "img": 2,
+     "video": 0,
+     "canvas": 4,
+     "svg": 32,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "WaveNode API",
+     "words": 2,
+     "chars": 12,
+     "lines": 1,
+     "size": 72,
+     "vw": 5,
+     "font": "system-ui",
+     "weight": 700,
+     "tracking": -0.025,
+     "leading": 1,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "left",
+     "widthRatio": 0.44,
+     "top": 235,
+     "gradientText": true,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "WaveNode API",
+     "words": 2,
+     "lines": 1,
+     "size": 72,
+     "font": "system-ui"
+    },
+    "headings": [
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 72,
+      "vw": 5,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": -0.025,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.44,
+      "top": 235,
+      "gradientText": true,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "全球订阅价格",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 40,
+      "vw": 2.8,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.045,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.22,
+      "top": 795,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "¥107.42",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 52,
+      "vw": 3.6,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.23,
+      "top": 1113,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥118.16",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 52,
+      "vw": 3.6,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.23,
+      "top": 1113,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥175.67",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 52,
+      "vw": 3.6,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.23,
+      "top": 1113,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "Subscription to API Conversion Platform",
+      "words": 5,
+      "chars": 39,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.47,
+      "top": 1681,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "已支持的 AI 模型",
+      "words": 3,
+      "chars": 10,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.2,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.15,
+      "top": 2385,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 52,
+      "vw": 3.6,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.06,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.34,
+      "top": 2767,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 8,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "system-ui",
+       "share": 0.81,
+       "mono": false
+      },
+      {
+       "family": "ui-monospace",
+       "share": 0.19,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      18,
+      19,
+      30,
+      40,
+      52,
+      72
+     ],
+     "sizeCount": 13,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 72,
+      "vw": 5,
+      "font": "system-ui",
+      "text": "WaveNode API"
+     },
+     "monoShare": 0.19,
+     "monoProseShare": 0.19,
+     "monoFamilies": [
+      "ui-monospace"
+     ],
+     "monoSamples": [
+      "gateway / request.flow",
+      "live",
+      "REQUEST 01 / 01",
+      "$",
+      "curl",
+      "-X POST"
+     ],
+     "microLabels": 19,
+     "microLabelShare": 0.127,
+     "microSamples": [
+      "live",
+      "REQUEST 01 / 01",
+      "SECURE ROUTING",
+      "STREAM READY",
+      "STATUS 200",
+      "GLOBAL PRICE INDEX"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.01,
+     "smallText": 12
+    },
+    "eyebrows": [
+     {
+      "text": "GLOBAL PRICE INDEX",
+      "above": "全球订阅价格",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 10.4,
+      "top": 768
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥107.42",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1068
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥118.16",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1068
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥175.67",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1068
+     },
+     {
+      "text": "一键接入",
+      "above": "Subscription to API Conversion Platform",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 1657
+     },
+     {
+      "text": "已支持",
+      "above": "已支持的 AI 模型",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 2361
+     },
+     {
+      "text": "准备好开始了吗？",
+      "above": "WaveNode API",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 2736
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f9fafb",
+     "bodyBgHsl": {
+      "h": 210,
+      "s": 0.2,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#f8fafc",
+       "top": 0,
+       "hsl": {
+        "h": 210,
+        "s": 0.4,
+        "l": 0.98
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#64746e",
+       "share": 0.18
+      },
+      {
+       "color": "#12251e",
+       "share": 0.18
+      },
+      {
+       "color": "#64748b",
+       "share": 0.1
+      },
+      {
+       "color": "#4b5563",
+       "share": 0.07
+      },
+      {
+       "color": "#111827",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#0f766e",
+      "hsl": {
+       "h": 175,
+       "s": 0.77,
+       "l": 0.26
+      },
+      "fg": "#f0fdfa"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 10,
+     "height": 42,
+     "withShadow": 3,
+     "withGradient": 3,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "登录",
+      "立即开始"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 11,
+     "shadowOverlay": 2,
+     "shadowSamples": [
+      "div.hero-trace.hero-trace--one → rgba(13, 148, 136, 0.055) 0px 0px 34px 0px",
+      "div.hero-trace.hero-trace--two → rgba(13, 148, 136, 0.055) 0px 0px 34px 0px",
+      "a.specular-button.specular-button--lg → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 118, 110, 0.2) 0px 14p",
+      "div.terminal-window → rgba(15, 23, 42, 0.65) 0px 32px 90px -36px, rgba(255, 255, 255, 0.04) 0px 0px 0p"
+     ],
+     "gradients": 10,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.home-landing.relative → radial-gradient(at 50% -12%, rgba(20, 184, 166, 0.12), rgba(0, 0, 0, 0) 54%), linear-gradient(rgba(255, 255, 2",
+      "div.hero-interaction-layer → radial-gradient(672px at 50% 28%, rgba(13, 148, 136, 0.16), rgba(0, 0, 0, 0) 62%), linear-gradient(rgba(14, 11",
+      "div.hero-grid → linear-gradient(rgba(15, 118, 110, 0.075) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(15, 118, 110",
+      "div.hero-sweep → linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(94, 234, 212, 0.5), rgba(0, 0, 0, 0))"
+     ],
+     "gradientText": 1,
+     "hairlines": 20,
+     "hairlineSamples": [
+      "div.terminal-header 572px",
+      "div.terminal-footer 576px",
+      "section.home-reveal.mt-14 1280px",
+      "a.op-region-row 368px",
+      "a.op-region-row 368px"
+     ],
+     "outlinedBoxes": 11,
+     "dashed": 0,
+     "blurred": 11,
+     "roundedBoxes": 12,
+     "boxRadius": 14,
+     "squareMedia": 1,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": true,
+       "rounded": true,
+       "top": 912
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": true,
+     "height": 62,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": []
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 3299,
+    "margins": {
+     "left": 80,
+     "right": 80
+    },
+    "sections": [
+     {
+      "sel": "div.hero-grid",
+      "tag": "div",
+      "top": 62,
+      "height": 3136,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-sweep",
+      "tag": "div",
+      "top": -440,
+      "height": 4265,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.home-aurora",
+      "tag": "div",
+      "top": -18,
+      "height": 544,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "section.hero-section.home-reveal",
+      "tag": "section",
+      "top": 142,
+      "height": 392,
+      "words": 41,
+      "media": 0,
+      "middle": 260,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 72,
+       "tag": "h1"
+      },
+      "left": 61,
+      "right": 79,
+      "textLeft": 80,
+      "textRight": 79,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#official-prices.op-section.!px-0",
+      "tag": "section",
+      "top": 768,
+      "height": 793,
+      "words": 83,
+      "media": 0,
+      "middle": 65,
+      "heading": {
+       "text": "107.42",
+       "size": 52,
+       "tag": "span"
+      },
+      "left": 80,
+      "right": 80,
+      "textLeft": 80,
+      "textRight": 80,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#home-features.mt-16.scroll-mt-24",
+      "tag": "section",
+      "top": 1657,
+      "height": 608,
+      "words": 6,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Subscription to API Conversion Platform",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 64,
+      "right": 64,
+      "textLeft": 80,
+      "textRight": 845,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.home-reveal.mt-16",
+      "tag": "section",
+      "top": 2361,
+      "height": 166,
+      "words": 16,
+      "media": 0,
+      "middle": 227,
+      "heading": {
+       "text": "已支持的 AI 模型",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 80,
+      "right": 80,
+      "textLeft": 80,
+      "textRight": 80,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-cta.home-reveal",
+      "tag": "section",
+      "top": 2623,
+      "height": 479,
+      "words": 24,
+      "media": 0,
+      "middle": 256,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 52,
+       "tag": "h2"
+      },
+      "left": 101,
+      "right": 137,
+      "textLeft": 120,
+      "textRight": 137,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "WaveNode API",
+      "size": 72,
+      "top": 235,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 80,
+      "n": 4
+     },
+     {
+      "x": 120,
+      "n": 1
+     },
+     {
+      "x": 152,
+      "n": 1
+     },
+     {
+      "x": 586,
+      "n": 1
+     },
+     {
+      "x": 1019,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 8,
+    "bodySize": 11,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0.16,
+    "voidBox": {
+     "x": 960,
+     "y": 480,
+     "w": 480,
+     "h": 420
+    }
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 5,
+   "filled": [
+    0.99,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 31,
+    "css": 15,
+    "transitions": 15,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 4892,
+     "screens": 4.8,
+     "words": 247,
+     "img": 2,
+     "video": 0,
+     "canvas": 4,
+     "svg": 32,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "WaveNode API",
+     "words": 2,
+     "chars": 12,
+     "lines": 1,
+     "size": 48,
+     "vw": 6.3,
+     "font": "system-ui",
+     "weight": 700,
+     "tracking": -0.025,
+     "leading": 1,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.94,
+     "top": 158,
+     "gradientText": true,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "WaveNode API",
+     "words": 2,
+     "lines": 1,
+     "size": 48,
+     "font": "system-ui"
+    },
+    "headings": [
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 48,
+      "vw": 6.3,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": -0.025,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.94,
+      "top": 158,
+      "gradientText": true,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "全球订阅价格",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 27.2,
+      "vw": 3.5,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.045,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.4,
+      "top": 977,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "¥107.42",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 6.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.68,
+      "top": 1280,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥118.16",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 6.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.68,
+      "top": 1905,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥175.67",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 6.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.68,
+      "top": 2531,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "Subscription to API Conversion Platform",
+      "words": 5,
+      "chars": 39,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.88,
+      "top": 3094,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "已支持的 AI 模型",
+      "words": 3,
+      "chars": 10,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.2,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.28,
+      "top": 3670,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 32,
+      "vw": 4.2,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.06,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.83,
+      "top": 4158,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 8,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "system-ui",
+       "share": 0.81,
+       "mono": false
+      },
+      {
+       "family": "ui-monospace",
+       "share": 0.19,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      18,
+      19,
+      27,
+      30,
+      32,
+      48
+     ],
+     "sizeCount": 13,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 48,
+      "vw": 6.3,
+      "font": "system-ui",
+      "text": "WaveNode API"
+     },
+     "monoShare": 0.19,
+     "monoProseShare": 0.19,
+     "monoFamilies": [
+      "ui-monospace"
+     ],
+     "monoSamples": [
+      "gateway / request.flow",
+      "live",
+      "REQUEST 01 / 01",
+      "$",
+      "curl",
+      "-X POST"
+     ],
+     "microLabels": 19,
+     "microLabelShare": 0.127,
+     "microSamples": [
+      "live",
+      "REQUEST 01 / 01",
+      "SECURE ROUTING",
+      "STREAM READY",
+      "STATUS 200",
+      "GLOBAL PRICE INDEX"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.06,
+     "smallText": 12
+    },
+    "eyebrows": [
+     {
+      "text": "GLOBAL PRICE INDEX",
+      "above": "全球订阅价格",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 10.4,
+      "top": 950
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥107.42",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1235
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥118.16",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1861
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥175.67",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 2486
+     },
+     {
+      "text": "一键接入",
+      "above": "Subscription to API Conversion Platform",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 3070
+     },
+     {
+      "text": "已支持",
+      "above": "已支持的 AI 模型",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 3646
+     },
+     {
+      "text": "准备好开始了吗？",
+      "above": "WaveNode API",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 4127
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f9fafb",
+     "bodyBgHsl": {
+      "h": 210,
+      "s": 0.2,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#f8fafc",
+       "top": 0,
+       "hsl": {
+        "h": 210,
+        "s": 0.4,
+        "l": 0.98
+       }
+      },
+      {
+       "color": "#ffffff",
+       "top": 1078,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#64746e",
+       "share": 0.18
+      },
+      {
+       "color": "#12251e",
+       "share": 0.18
+      },
+      {
+       "color": "#64748b",
+       "share": 0.1
+      },
+      {
+       "color": "#4b5563",
+       "share": 0.07
+      },
+      {
+       "color": "#111827",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#0f766e",
+      "hsl": {
+       "h": 175,
+       "s": 0.77,
+       "l": 0.26
+      },
+      "fg": "#f0fdfa"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 10,
+     "height": 42,
+     "withShadow": 3,
+     "withGradient": 3,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "登录",
+      "立即开始"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 11,
+     "shadowOverlay": 2,
+     "shadowSamples": [
+      "div.hero-trace.hero-trace--one → rgba(13, 148, 136, 0.055) 0px 0px 34px 0px",
+      "div.hero-trace.hero-trace--two → rgba(13, 148, 136, 0.055) 0px 0px 34px 0px",
+      "a.specular-button.specular-button--lg → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 118, 110, 0.2) 0px 14p",
+      "div.terminal-window → rgba(15, 23, 42, 0.65) 0px 32px 90px -36px, rgba(255, 255, 255, 0.04) 0px 0px 0p"
+     ],
+     "gradients": 10,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.home-landing.relative → radial-gradient(at 50% -12%, rgba(20, 184, 166, 0.12), rgba(0, 0, 0, 0) 54%), linear-gradient(rgba(255, 255, 2",
+      "div.hero-interaction-layer → radial-gradient(672px at 50% 28%, rgba(13, 148, 136, 0.16), rgba(0, 0, 0, 0) 62%), linear-gradient(rgba(14, 11",
+      "div.hero-grid → linear-gradient(rgba(15, 118, 110, 0.075) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(15, 118, 110",
+      "div.hero-sweep → linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(94, 234, 212, 0.5), rgba(0, 0, 0, 0))"
+     ],
+     "gradientText": 1,
+     "hairlines": 20,
+     "hairlineSamples": [
+      "div.terminal-header 572px",
+      "div.terminal-footer 576px",
+      "section.home-reveal.mt-14 720px",
+      "a.op-region-row 563px",
+      "a.op-region-row 563px"
+     ],
+     "outlinedBoxes": 11,
+     "dashed": 0,
+     "blurred": 11,
+     "roundedBoxes": 12,
+     "boxRadius": 14,
+     "squareMedia": 1,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": true,
+       "rounded": true,
+       "top": 1078
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": true,
+     "height": 62,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": []
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 4892,
+    "margins": {
+     "left": 24,
+     "right": 24
+    },
+    "sections": [
+     {
+      "sel": "div.hero-grid",
+      "tag": "div",
+      "top": 62,
+      "height": 4729,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-trace.hero-trace--one",
+      "tag": "div",
+      "top": 49,
+      "height": 410,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-trace.hero-trace--two",
+      "tag": "div",
+      "top": 190,
+      "height": 481,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-sweep",
+      "tag": "div",
+      "top": -672,
+      "height": 6385,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-cursor-light",
+      "tag": "div",
+      "top": 1087,
+      "height": 599,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "div.home-aurora",
+      "tag": "div",
+      "top": -18,
+      "height": 544,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "section.hero-section.home-reveal",
+      "tag": "section",
+      "top": 126,
+      "height": 590,
+      "words": 41,
+      "media": 0,
+      "middle": 43,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 48,
+       "tag": "h1"
+      },
+      "left": 115,
+      "right": 95,
+      "textLeft": 115,
+      "textRight": 95,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#official-prices.op-section.!px-0",
+      "tag": "section",
+      "top": 950,
+      "height": 2025,
+      "words": 83,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "107.42",
+       "size": 48,
+       "tag": "span"
+      },
+      "left": 24,
+      "right": 24,
+      "textLeft": 24,
+      "textRight": 24,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#home-features.mt-16.scroll-mt-24",
+      "tag": "section",
+      "top": 3070,
+      "height": 480,
+      "words": 6,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Subscription to API Conversion Platform",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 24,
+      "right": 229,
+      "textLeft": 24,
+      "textRight": 229,
+      "fullBleed": true,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.home-reveal.mt-16",
+      "tag": "section",
+      "top": 3646,
+      "height": 338,
+      "words": 16,
+      "media": 0,
+      "middle": 221,
+      "heading": {
+       "text": "已支持的 AI 模型",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 24,
+      "right": 24,
+      "textLeft": 24,
+      "textRight": 24,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-cta.home-reveal",
+      "tag": "section",
+      "top": 4080,
+      "height": 646,
+      "words": 24,
+      "media": 0,
+      "middle": 146,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 36,
+      "right": 72,
+      "textLeft": 55,
+      "textRight": 72,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "WaveNode API",
+      "size": 48,
+      "top": 158,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 24,
+      "n": 3
+     },
+     {
+      "x": 152,
+      "n": 3
+     },
+     {
+      "x": 55,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 7,
+    "bodySize": 11,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 6,
+   "filled": [
+    1,
+    0.98,
+    1,
+    1,
+    0.97,
+    1
+   ],
+   "motion": {
+    "elements": 28,
+    "css": 12,
+    "transitions": 15,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 5053,
+     "screens": 6,
+     "words": 243,
+     "img": 2,
+     "video": 0,
+     "canvas": 4,
+     "svg": 32,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "WaveNode API",
+     "words": 2,
+     "chars": 12,
+     "lines": 1,
+     "size": 36,
+     "vw": 9.2,
+     "font": "system-ui",
+     "weight": 700,
+     "tracking": -0.025,
+     "leading": 1.08,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.92,
+     "top": 134,
+     "gradientText": true,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "WaveNode API",
+     "words": 2,
+     "lines": 1,
+     "size": 36,
+     "font": "system-ui"
+    },
+    "headings": [
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 36,
+      "vw": 9.2,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": -0.025,
+      "leading": 1.08,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 134,
+      "gradientText": true,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "全球订阅价格",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 27.2,
+      "vw": 7,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.045,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.79,
+      "top": 947,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "¥107.42",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.69,
+      "top": 1242,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥118.16",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.69,
+      "top": 1867,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "¥175.67",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "weight": 650,
+      "tracking": -0.055,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.69,
+      "top": 2493,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "Subscription to API Conversion Platform",
+      "words": 5,
+      "chars": 39,
+      "lines": 2,
+      "size": 24,
+      "vw": 6.2,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.33,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3071,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "已支持的 AI 模型",
+      "words": 3,
+      "chars": 10,
+      "lines": 1,
+      "size": 24,
+      "vw": 6.2,
+      "font": "system-ui",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.33,
+      "upper": true,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3619,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "WaveNode API",
+      "words": 2,
+      "chars": 12,
+      "lines": 1,
+      "size": 32,
+      "vw": 8.2,
+      "font": "system-ui",
+      "weight": 700,
+      "tracking": 0,
+      "leading": 1.06,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.84,
+      "top": 4273,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 8,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "system-ui",
+       "share": 0.82,
+       "mono": false
+      },
+      {
+       "family": "ui-monospace",
+       "share": 0.18,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      18,
+      19,
+      24,
+      27,
+      32,
+      36,
+      48
+     ],
+     "sizeCount": 15,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 48,
+      "vw": 12.3,
+      "font": "system-ui",
+      "text": "107.42"
+     },
+     "monoShare": 0.18,
+     "monoProseShare": 0.18,
+     "monoFamilies": [
+      "ui-monospace"
+     ],
+     "monoSamples": [
+      "gateway / request.flow",
+      "live",
+      "REQUEST 01 / 01",
+      "$",
+      "curl",
+      "-X POST"
+     ],
+     "microLabels": 16,
+     "microLabelShare": 0.115,
+     "microSamples": [
+      "live",
+      "REQUEST 01 / 01",
+      "SECURE ROUTING",
+      "STREAM READY",
+      "STATUS 200",
+      "GLOBAL PRICE INDEX"
+     ],
+     "upperShare": 0.16,
+     "centerShare": 0.09,
+     "smallText": 15
+    },
+    "eyebrows": [
+     {
+      "text": "GLOBAL PRICE INDEX",
+      "above": "全球订阅价格",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 10.4,
+      "top": 919
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥107.42",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1197
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥118.16",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 1822
+     },
+     {
+      "text": "已收录地区最低价",
+      "above": "¥175.67",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 10.4,
+      "top": 2448
+     },
+     {
+      "text": "一键接入",
+      "above": "Subscription to API Conversion Platform",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 3047
+     },
+     {
+      "text": "已支持",
+      "above": "已支持的 AI 模型",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 3595
+     },
+     {
+      "text": "准备好开始了吗？",
+      "above": "WaveNode API",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 4242
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f9fafb",
+     "bodyBgHsl": {
+      "h": 210,
+      "s": 0.2,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#f8fafc",
+       "top": 0,
+       "hsl": {
+        "h": 210,
+        "s": 0.4,
+        "l": 0.98
+       }
+      },
+      {
+       "color": "#ffffff",
+       "top": 1040,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#64746e",
+       "share": 0.19
+      },
+      {
+       "color": "#12251e",
+       "share": 0.18
+      },
+      {
+       "color": "#64748b",
+       "share": 0.09
+      },
+      {
+       "color": "#4b5563",
+       "share": 0.07
+      },
+      {
+       "color": "#111827",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#0f766e",
+      "hsl": {
+       "h": 175,
+       "s": 0.77,
+       "l": 0.26
+      },
+      "fg": "#f0fdfa"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 10,
+     "height": 42,
+     "withShadow": 3,
+     "withGradient": 3,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "登录",
+      "立即开始"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 9,
+     "shadowOverlay": 2,
+     "shadowSamples": [
+      "a.specular-button.specular-button--lg → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 118, 110, 0.2) 0px 14p",
+      "div.terminal-window → rgba(15, 23, 42, 0.65) 0px 32px 90px -36px, rgba(255, 255, 255, 0.04) 0px 0px 0p",
+      "div.terminal-float.terminal-float--top → rgba(15, 23, 42, 0.12) 0px 12px 34px 0px",
+      "div.terminal-float.terminal-float--bottom → rgba(15, 23, 42, 0.12) 0px 12px 34px 0px"
+     ],
+     "gradients": 9,
+     "scrims": 2,
+     "gradientSamples": [
+      "div.home-landing.relative → radial-gradient(at 50% -12%, rgba(20, 184, 166, 0.12), rgba(0, 0, 0, 0) 54%), linear-gradient(rgba(255, 255, 2",
+      "div.hero-interaction-layer → radial-gradient(672px at 50% 28%, rgba(13, 148, 136, 0.16), rgba(0, 0, 0, 0) 62%), linear-gradient(rgba(14, 11",
+      "div.hero-grid → linear-gradient(rgba(15, 118, 110, 0.075) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(15, 118, 110",
+      "div.hero-cursor-light → radial-gradient(circle, rgba(20, 184, 166, 0.18), rgba(37, 99, 235, 0.07) 34%, rgba(0, 0, 0, 0) 68%)"
+     ],
+     "gradientText": 1,
+     "hairlines": 19,
+     "hairlineSamples": [
+      "div.terminal-header 354px",
+      "div.terminal-footer 357px",
+      "section.home-reveal.mt-14 358px",
+      "a.op-region-row 313px",
+      "a.op-region-row 313px"
+     ],
+     "outlinedBoxes": 8,
+     "dashed": 0,
+     "blurred": 11,
+     "roundedBoxes": 9,
+     "boxRadius": 14,
+     "squareMedia": 1,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": true,
+     "height": 62,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": []
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 5053,
+    "margins": {
+     "left": 16,
+     "right": 22
+    },
+    "sections": [
+     {
+      "sel": "div.hero-grid",
+      "tag": "div",
+      "top": 62,
+      "height": 4854,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.hero-cursor-light",
+      "tag": "div",
+      "top": 1269,
+      "height": 304,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.home-aurora",
+      "tag": "div",
+      "top": -18,
+      "height": 544,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.hero-section.home-reveal",
+      "tag": "section",
+      "top": 102,
+      "height": 583,
+      "words": 41,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 36,
+       "tag": "h1"
+      },
+      "left": 33,
+      "right": 25,
+      "textLeft": 33,
+      "textRight": 25,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.home-reveal.mt-14",
+      "tag": "section",
+      "top": 741,
+      "height": 130,
+      "words": 4,
+      "media": 0,
+      "middle": 15,
+      "heading": null,
+      "left": 117,
+      "right": 75,
+      "textLeft": 117,
+      "textRight": 75,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#official-prices.op-section.!px-0",
+      "tag": "section",
+      "top": 919,
+      "height": 2064,
+      "words": 83,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "107.42",
+       "size": 48,
+       "tag": "span"
+      },
+      "left": 16,
+      "right": 22,
+      "textLeft": 16,
+      "textRight": 22,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#home-features.mt-16.scroll-mt-24",
+      "tag": "section",
+      "top": 3047,
+      "height": 484,
+      "words": 6,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "Subscription to API Conversion Platform",
+       "size": 24,
+       "tag": "h2"
+      },
+      "left": 8,
+      "right": 8,
+      "textLeft": 16,
+      "textRight": 54,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.home-reveal.mt-16",
+      "tag": "section",
+      "top": 3595,
+      "height": 538,
+      "words": 16,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "已支持的 AI 模型",
+       "size": 24,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 203,
+      "textLeft": 16,
+      "textRight": 203,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-cta.home-reveal",
+      "tag": "section",
+      "top": 4197,
+      "height": 655,
+      "words": 21,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "WaveNode API",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 13,
+      "right": 69,
+      "textLeft": 32,
+      "textRight": 69,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.relative.z-10",
+      "tag": "footer",
+      "top": 4916,
+      "height": 137,
+      "words": 6,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 88,
+      "right": 48,
+      "textLeft": 88,
+      "textRight": 48,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "WaveNode API",
+      "size": 36,
+      "top": 134,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 16,
+      "n": 3
+     },
+     {
+      "x": 88,
+      "n": 3
+     },
+     {
+      "x": 32,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 7,
+    "bodySize": 11,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "FAIL",
+   "id": "eyebrow",
+   "width": 1440,
+   "message": "7 eyebrow/kicker label(s) above headings: \"GLOBAL PRICE INDEX\" above \"全球订阅价格\"; \"已收录地区最低价\" (pill) above \"¥107.42\"; \"已收录地区最低价\" (pill) above \"¥118.16\"; \"已收录地区最低价\" (pill) above \"¥175.67\"; \"一键接入\" above \"Subscription to API Conversion Platform\"",
+   "fix": "Delete them. If the label carried real information, fold it into the headline or the supporting sentence.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "mono",
+   "width": 1440,
+   "message": "Monospace type outside code: ui-monospace — e.g. \"gateway / request.flow\", \"live\", \"REQUEST 01 / 01\", \"$\"",
+   "fix": "Set it in the text face. Monospace is for literal code inside <pre>/<code> only.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "micro-label",
+   "width": 1440,
+   "message": "19 tiny uppercase letter-spaced labels (e.g. \"live\", \"REQUEST 01 / 01\", \"SECURE ROUTING\", \"STREAM READY\").",
+   "fix": "Use sentence-case text at a readable size, or delete the label.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient",
+   "width": 1440,
+   "message": "10 gradient fill(s): div.home-landing.relative → radial-gradient(at 50% -12%, rgba(20, 184, 166, 0.12), rgba(0, 0, 0, 0) 54%), linear-gradient(rgba(255, 255, 2 | div.hero-interaction-layer → radial-gradient(672px at 50% 28%, rgba(13, 148, 136, 0.16), rgba(0, 0, 0, 0) 62%), linear-gradient(rgba(14, 11 | div.hero-grid → linear-gradient(rgba(15, 118, 110, 0.075) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(15, 118, 110",
+   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient-text",
+   "width": 1440,
+   "message": "1 gradient-filled text element(s).",
+   "fix": "Solid colour text.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "shadow",
+   "width": 1440,
+   "message": "11 box-shadow(s) on elements at rest: div.hero-trace.hero-trace--one → rgba(13, 148, 136, 0.055) 0px 0px 34px 0px | div.hero-trace.hero-trace--two → rgba(13, 148, 136, 0.055) 0px 0px 34px 0px | a.specular-button.specular-button--lg → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 118, 110, 0.2) 0px 14p",
+   "fix": "Remove. Separate surfaces with a tone step or space. Shadows are for things that really float (menus, dialogs, sticky bars).",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "button-fx",
+   "width": 1440,
+   "message": "Buttons with gradient fill and shadow/glow.",
+   "fix": "Flat fill, one colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "hairline",
+   "width": 1440,
+   "message": "20 thin rule(s)/divider line(s): div.terminal-header 572px | div.terminal-footer 576px | section.home-reveal.mt-14 1280px | a.op-region-row 368px",
+   "fix": "Delete. Separate with space, a tone change, or scale. Lines are only for real tables and form fields.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "outlined-box",
+   "width": 1440,
+   "message": "11 boxes drawn with a 1px outline.",
+   "fix": "Define a surface by its fill (one tone step from the page) or leave the content unboxed.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "glass",
+   "width": 1440,
+   "message": "11 backdrop-blur surfaces.",
+   "fix": "One blurred sticky bar at most; glass cards are a tell.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "icon-cards",
+   "width": 1440,
+   "message": "1 row(s) of identical cards each topped with a small icon (3 cards).",
+   "fix": "Replace with one composed section from the direction: a narrative split, a list set in large type, or real imagery per item.",
+   "alsoAt": [
+    768
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "size-count",
+   "width": 1440,
+   "message": "13 different font sizes (9, 10, 11, 12, 13, 14, 16, 18, 19, 30, 40, 52, 72).",
+   "fix": "A page needs about five: display, heading, lead, body, small.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "few-pictures",
+   "width": 1440,
+   "message": "Only 0 picture(s) on the page (0 photographs, footage or raster images, 0 interface fragments). Drawings in SVG do not count.",
+   "fix": "Find real pictures of the subject's world with scripts/assets.mjs (photographs, archival images, maps, engravings, footage), download them to assets/ and give them room: a hero picture, one per section that has a subject, a full-width band. At least four, usually six to twelve."
+  },
+  {
+   "level": "WARN",
+   "id": "no-footage",
+   "width": 1440,
+   "message": "No video anywhere on the page.",
+   "fix": "Look for one honest clip with scripts/assets.mjs --video (the place, the material, the process) and use it as a muted loop with a poster frame. Defend its absence only if no clip fits the subject."
+  },
+  {
+   "level": "FAIL",
+   "id": "small-text",
+   "width": 1440,
+   "message": "12 text blocks under 13px.",
+   "fix": "Nothing meant to be read goes below 13px.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "late-title",
+   "width": 1440,
+   "message": "The title is not readable 1.2s after the page loaded (it is at 0% opacity).",
+   "fix": "Put the headline in the HTML, painted on the first frame; the load sequence only adds arrival and is settled by 1.2s (references/motion.md, \"Load sequence in 1.2 seconds\"). No preloader, no gate, no waiting for the load event."
+  },
+  {
+   "level": "WARN",
+   "id": "name-only-title",
+   "width": 390,
+   "message": "The h1 is a bare name (\"WaveNode API\") and nothing else on the first screen says what this is.",
+   "fix": "Keep the name if it leads, and give the line under it (18px or more) the plain words: what it is, for whom, where or when. In the study of 97 Sites of the Day, first screens that named nothing lost usability and content points."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/desktop-fold.jpg",
+   "pages": [
+    "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/desktop-page-01.jpg"
+   ],
+   "film": [
+    "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/desktop-film-01.jpg"
+   ]
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/tablet-fold.jpg",
+   "pages": [
+    "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/mobile-fold.jpg",
+   "pages": [
+    "/Users/chenjiantao/Documents/project/WaveNode/sub2api/.taste-skill/before/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

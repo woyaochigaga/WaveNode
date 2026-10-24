@@ -404,6 +404,13 @@ func ProvideAccountExpiryService(accountRepo AccountRepository) *AccountExpirySe
 	return svc
 }
 
+// ProvideOfficialPricesService 启动可配置周期的公开订阅价格同步，默认开关关闭。
+func ProvideOfficialPricesService(repo SettingRepository, cfg *config.Config) *OfficialPricesService {
+	svc := NewOfficialPricesService(repo, cfg)
+	svc.Start()
+	return svc
+}
+
 // ProvideOpenAICodexVersionSyncService creates and starts OpenAICodexVersionSyncService.
 // 出站 Codex 身份的版本号靠它跟随官方发布，无需为了跟版本而发新版本；面板可关闭。
 func ProvideOpenAICodexVersionSyncService(
@@ -940,6 +947,7 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(GrokOAuthReconciler), new(*TokenRefreshService)),
 	ProvideAccountExpiryService,
 	ProvideOpenAICodexVersionSyncService,
+	ProvideOfficialPricesService,
 	ProvideClaudeCodeVersionSyncService,
 	ProvideProxyExpiryService,
 	ProvideSubscriptionExpiryService,

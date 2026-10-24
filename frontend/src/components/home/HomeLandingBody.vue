@@ -1,7 +1,7 @@
 <template>
   <main
     ref="landingBody"
-    class="relative z-10 flex-1 px-4 pb-16 pt-10 sm:px-6 sm:pt-16 lg:pb-24 lg:pt-20"
+    class="relative z-10 flex-1 px-4 pb-24 sm:px-6 lg:pb-32"
     :style="interactionStyle"
     @pointermove="handlePointerMove"
     @pointerleave="resetPointer"
@@ -17,6 +17,8 @@
     <div class="home-aurora" aria-hidden="true"></div>
 
     <div class="landing-content mx-auto max-w-7xl">
+      <!-- 首屏包含主视觉与能力标签，整体填满导航下方的可用高度。 -->
+      <div class="home-first-screen">
       <section
         ref="heroSection"
         class="hero-section home-reveal relative grid items-center gap-12 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:py-12"
@@ -109,7 +111,7 @@
         <div class="hero-scroll-meter" aria-hidden="true"><span></span></div>
       </section>
 
-      <section class="home-reveal mt-14 border-y border-gray-200/70 py-6 dark:border-dark-700/70 sm:mt-20 sm:py-7" data-reveal style="--reveal-delay: 80ms">
+      <section class="home-reveal mt-14 shrink-0 border-y border-gray-200/70 py-6 dark:border-dark-700/70 sm:mt-20 sm:py-7" data-reveal style="--reveal-delay: 80ms">
         <div class="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-12">
           <div v-for="tag in featureTags" :key="tag.key" class="flex items-center gap-2.5 text-sm font-medium text-gray-600 dark:text-dark-300">
             <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-300">
@@ -119,8 +121,9 @@
           </div>
         </div>
       </section>
+      </div>
 
-      <section id="home-features" class="mt-16 scroll-mt-24 sm:mt-24">
+      <section id="home-features" class="mt-24 scroll-mt-24 sm:mt-32">
         <div class="mb-7 home-reveal sm:mb-9" data-reveal>
           <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-primary-600 dark:text-primary-400">
             {{ t('home.features.unifiedGateway') }}
@@ -139,7 +142,10 @@
         </div>
       </section>
 
-      <section class="home-reveal mt-16 sm:mt-24" data-reveal style="--reveal-delay: 100ms">
+      <!-- 全球订阅价格紧跟“一键接入”模块，先让用户理解能力，再查看价格。 -->
+      <HomeOfficialPrices class="!mb-0 !mt-24 !px-0 sm:!mt-32" />
+
+      <section class="home-reveal mt-24 sm:mt-32" data-reveal style="--reveal-delay: 100ms">
         <div class="mb-7 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-primary-600 dark:text-primary-400">
@@ -178,7 +184,7 @@
       </section>
 
       <HomeLandingCta
-        class="home-reveal mt-16 sm:mt-24"
+        class="home-reveal mt-24 sm:mt-32"
         data-reveal
         style="--reveal-delay: 80ms"
         :site-name="siteName"
@@ -197,6 +203,7 @@ import Icon from '@/components/icons/Icon.vue'
 import CircularGallery from '@/components/ui/CircularGallery.vue'
 import SpecularButton from '@/components/ui/SpecularButton.vue'
 import HomeLandingCta from '@/components/home/HomeLandingCta.vue'
+import HomeOfficialPrices from '@/components/home/HomeOfficialPrices.vue'
 
 defineProps<{
   siteName: string
@@ -497,7 +504,16 @@ onBeforeUnmount(() => {
   transition: top 220ms ease-out, left 220ms ease-out, opacity 300ms ease;
 }
 
+.home-first-screen {
+  /* 导航默认高度为 62px；最小高度允许小屏或长文案自然撑开，避免裁切。 */
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - 62px);
+  padding-block: 2rem 1.5rem;
+}
+
 .hero-section {
+  flex: 1;
   transform-style: preserve-3d;
   will-change: transform;
 }

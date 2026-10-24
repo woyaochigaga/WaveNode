@@ -8597,12 +8597,13 @@
         <!-- /Tab: Email -->
 
         <!-- Tab: Backup -->
+        <OfficialPricesSettings v-if="activeTab === 'officialPrices'" />
         <div v-show="activeTab === 'backup'">
           <BackupSettings />
         </div>
 
         <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="settings-save-bar">
+        <div v-show="activeTab !== 'backup' && activeTab !== 'officialPrices'" class="settings-save-bar">
           <button
             type="submit"
             :disabled="saving || loadFailed"
@@ -8732,6 +8733,7 @@ import Toggle from "@/components/common/Toggle.vue";
 import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
+import OfficialPricesSettings from "@/views/admin/settings/OfficialPricesSettings.vue";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
 import OpenAIFastPolicyUserSelector from "@/views/admin/settings/OpenAIFastPolicyUserSelector.vue";
 import { useClipboard } from "@/composables/useClipboard";
@@ -8792,6 +8794,7 @@ type SettingsTab =
   | "gateway"
   | "payment"
   | "email"
+  | "officialPrices"
   | "backup";
 const activeTab = ref<SettingsTab>("general");
 // 记住管理员上次对设置分类栏的收起状态，避免每次进入页面都要重复操作。
@@ -8805,6 +8808,7 @@ const settingsTabs = [
   { key: "gateway" as SettingsTab, icon: "server" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
+  { key: "officialPrices" as SettingsTab, icon: "globe" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
 

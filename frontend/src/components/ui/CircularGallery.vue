@@ -128,36 +128,40 @@ function drawWrappedText(
 
 // 功能卡纹理由 Canvas 本地生成，避免第三方图片依赖，并可随主题即时重绘。
 function createCardTexture(item: CircularGalleryItem, isDark: boolean) {
+  // 保持 960×640 的排版坐标；使用二次幂纹理，让 WebGL 1 也能生成平滑缩小所需的 mipmap。
+  const width = 960
+  const height = 640
   const canvas = document.createElement('canvas')
-  canvas.width = 960
-  canvas.height = 640
+  canvas.width = 1024
+  canvas.height = 1024
   const context = canvas.getContext('2d')
   if (!context) throw new Error('CircularGallery: Canvas 2D is unavailable')
+  context.scale(canvas.width / width, canvas.height / height)
 
   const foreground = isDark ? '#f8fafc' : '#0f172a'
-  const muted = isDark ? '#94a3b8' : '#475569'
+  const muted = isDark ? '#cbd5e1' : '#334155'
   const surface = isDark ? '#070b14' : '#f8fbfc'
   const line = isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(15, 23, 42, 0.10)'
 
-  const background = context.createLinearGradient(0, 0, canvas.width, canvas.height)
+  const background = context.createLinearGradient(0, 0, width, height)
   background.addColorStop(0, surface)
   background.addColorStop(0.58, isDark ? '#0b1220' : '#ffffff')
   background.addColorStop(1, isDark ? '#0b1322' : '#eef6f7')
   context.fillStyle = background
-  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.fillRect(0, 0, width, height)
 
   context.strokeStyle = line
   context.lineWidth = 1
-  for (let x = 0; x <= canvas.width; x += 64) {
+  for (let x = 0; x <= width; x += 64) {
     context.beginPath()
     context.moveTo(x, 0)
-    context.lineTo(x, canvas.height)
+    context.lineTo(x, height)
     context.stroke()
   }
-  for (let y = 0; y <= canvas.height; y += 64) {
+  for (let y = 0; y <= height; y += 64) {
     context.beginPath()
     context.moveTo(0, y)
-    context.lineTo(canvas.width, y)
+    context.lineTo(width, y)
     context.stroke()
   }
 
@@ -192,13 +196,14 @@ function createCardTexture(item: CircularGalleryItem, isDark: boolean) {
   context.fillText(item.code, 84, 84)
 
   context.fillStyle = foreground
-  context.font = '700 52px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+  context.font = '700 64px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
   context.textBaseline = 'alphabetic'
-  context.fillText(item.title, 64, 396, 790)
+  context.fillText(item.title, 64, 330, 832)
 
+  // 卡片实际宽约 300–370px，正文提升至约 13–16px，并预留三行避免字号放大后截断。
   context.fillStyle = muted
-  context.font = '400 27px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-  drawWrappedText(context, item.description, 64, 452, 790, 44, 2)
+  context.font = '500 42px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+  drawWrappedText(context, item.description, 64, 394, 832, 56, 3)
 
   const footerGradient = context.createLinearGradient(64, 0, 300, 0)
   footerGradient.addColorStop(0, item.accent)
@@ -245,7 +250,13 @@ class GalleryMedia {
     this.bend = options.bend
     this.screen = options.screen
     this.viewport = options.viewport
-    this.texture = new Texture(this.gl, { generateMipmaps: true })
+    // 三线性过滤消除近邻采样的文字颗粒；各向异性采样改善倾斜卡片，OGL 自动适配设备上限。
+    this.texture = new Texture(this.gl, {
+      generateMipmaps: true,
+      minFilter: this.gl.LINEAR_MIPMAP_LINEAR,
+      magFilter: this.gl.LINEAR,
+      anisotropy: 4,
+    })
     this.texture.image = createCardTexture(options.item, options.isDark)
 
     this.program = new Program(this.gl, {
@@ -355,7 +366,9 @@ class CircularGalleryApp {
   private snapTimer: number | null = null
   private pointerId: number | null = null
   private pointerStart = 0
+  private pointerStartY = 0
   private scrollStart = 0
+  private gesture: 'pending' | 'horizontal' | 'vertical' = 'pending'
 
   constructor(container: HTMLElement, options: {
     items: CircularGalleryItem[]
@@ -370,7 +383,8 @@ class CircularGalleryApp {
     this.renderer = new Renderer({
       alpha: true,
       antialias: true,
-      dpr: Math.min(window.devicePixelRatio || 1, 2),
+      // 普通屏进行轻量超采样平滑字形，最高仍限制为 2 倍以控制移动端显存和填充开销。
+      dpr: Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2),
     })
     this.gl = this.renderer.gl
     this.gl.clearColor(0, 0, 0, 0)
@@ -452,21 +466,44 @@ class CircularGalleryApp {
     if (event.button !== 0) return
     this.pointerId = event.pointerId
     this.pointerStart = event.clientX
+    this.pointerStartY = event.clientY
     this.scrollStart = this.scroll.target
-    isDragging.value = true
-    this.container.setPointerCapture?.(event.pointerId)
+    this.gesture = event.pointerType === 'touch' ? 'pending' : 'horizontal'
+    isDragging.value = event.pointerType !== 'touch'
+    // 触摸端先不抢占指针，等确认是横向手势后再接管，避免阻塞页面上下滚动。
+    if (event.pointerType !== 'touch') this.container.setPointerCapture?.(event.pointerId)
   }
 
   private handlePointerMove = (event: PointerEvent) => {
     if (event.pointerId !== this.pointerId) return
-    // 触摸端保留纵向页面滚动，横向手势仍由 touch-action 驱动画廊。
-    if (event.pointerType !== 'touch') event.preventDefault()
+    if (event.pointerType === 'touch' && this.gesture === 'pending') {
+      const deltaX = event.clientX - this.pointerStart
+      const deltaY = event.clientY - this.pointerStartY
+      const distance = Math.max(Math.abs(deltaX), Math.abs(deltaY))
+
+      // 忽略轻微抖动，超过阈值后只让主方向决定交互归属。
+      if (distance < 8) return
+      this.gesture = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical'
+
+      if (this.gesture === 'vertical') {
+        this.pointerId = null
+        return
+      }
+
+      this.container.setPointerCapture?.(event.pointerId)
+      isDragging.value = true
+    }
+
+    if (this.gesture !== 'horizontal') return
+    // 横向触摸由画廊接管，纵向触摸仍交给浏览器滚动页面。
+    event.preventDefault()
     this.scroll.target = this.scrollStart + (this.pointerStart - event.clientX) * this.scrollSpeed * 0.012
   }
 
   private handlePointerUp = (event: PointerEvent) => {
     if (event.pointerId !== this.pointerId) return
     this.pointerId = null
+    this.gesture = 'pending'
     isDragging.value = false
     this.snap()
   }

@@ -52,7 +52,8 @@ var ErrRuntimeSettingsVersionConflict = infraerrors.Conflict(
 func ComputeSettingsVersion(values map[string]string) string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
-		if key != runtimeSettingsVersionKey {
+		// 订阅价格由独立面板保存，不属于网关配置；避免它使未改动的通用设置发生版本冲突。
+		if key != runtimeSettingsVersionKey && key != officialPricesConfigKey {
 			keys = append(keys, key)
 		}
 	}
