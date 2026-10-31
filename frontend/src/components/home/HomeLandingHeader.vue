@@ -1,7 +1,7 @@
 <template>
   <header class="landing-header sticky top-2 z-50 px-3 sm:px-5">
     <nav
-      class="landing-nav mx-auto flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-2.5 shadow-sm shadow-slate-900/5 backdrop-blur-xl sm:gap-4 sm:px-5"
+      class="landing-nav mx-auto flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-2.5 sm:gap-4 sm:px-5"
       :class="{ 'is-scrolled': isScrolled }"
     >
       <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -83,13 +83,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.landing-header {
+  /* 吸顶容器不再挤占首屏，让 Hero 背景能够延伸到导航下方。 */
+  min-height: 62px;
+  margin-bottom: -62px;
+  background: transparent;
+}
+
 .landing-nav {
   position: relative;
   z-index: 1;
   max-width: 80rem;
   min-height: 62px;
-  -webkit-backdrop-filter: blur(24px) saturate(155%);
-  backdrop-filter: blur(24px) saturate(155%);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
   transition:
     max-width 480ms cubic-bezier(0.22, 1, 0.36, 1),
     min-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -102,16 +110,7 @@ onBeforeUnmount(() => {
 }
 
 .landing-header::before {
-  position: absolute;
-  z-index: 0;
-  inset: -0.5rem 0 -1.75rem;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(248, 250, 252, 0.56) 58%, transparent 100%);
-  -webkit-backdrop-filter: blur(16px) saturate(145%);
-  backdrop-filter: blur(16px) saturate(145%);
-  mask-image: linear-gradient(180deg, black 0%, black 62%, transparent 100%);
-  -webkit-mask-image: linear-gradient(180deg, black 0%, black 62%, transparent 100%);
-  content: '';
+  content: none;
 }
 
 .landing-logo {
@@ -126,12 +125,12 @@ onBeforeUnmount(() => {
   min-height: 54px;
   padding-top: 0.45rem;
   padding-bottom: 0.45rem;
-  border-color: rgba(148, 163, 184, 0.28);
+  border-color: rgba(20, 184, 166, 0.2);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(237, 248, 247, 0.9);
   box-shadow:
-    0 18px 50px -28px rgba(15, 23, 42, 0.42),
-    0 0 0 1px rgba(255, 255, 255, 0.4);
+    0 18px 50px -28px rgba(15, 118, 110, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.32);
   transform: translateY(-2px);
 }
 
@@ -149,23 +148,17 @@ onBeforeUnmount(() => {
 }
 
 :global(.dark .landing-nav) {
-  border-color: rgba(148, 163, 184, 0.13);
-  background: rgba(3, 6, 15, 0.86);
-  box-shadow:
-    0 18px 50px -28px rgba(0, 0, 0, 0.72),
-    0 0 0 1px rgba(255, 255, 255, 0.03);
-}
-
-:global(.dark .landing-header::before) {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0.9) 0%, rgba(2, 6, 23, 0.58) 58%, transparent 100%);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 :global(.dark .landing-nav.is-scrolled) {
   border-color: rgba(94, 234, 212, 0.22);
-  background: rgba(2, 4, 10, 0.94);
+  background: rgba(9, 31, 42, 0.9);
   box-shadow:
-    0 22px 60px -28px rgba(0, 0, 0, 0.92),
-    0 0 32px rgba(20, 184, 166, 0.08);
+    0 22px 60px -28px rgba(3, 34, 43, 0.72),
+    0 0 0 1px rgba(94, 234, 212, 0.06);
 }
 
 @media (max-width: 639px) {
