@@ -575,6 +575,53 @@ func TestAccountTestService_GrokVideoUpstreamErrorIsNotMaskedAsSuccess(t *testin
 	require.NotContains(t, rec.Body.String(), `"success":true`)
 }
 
+func TestAccountTestService_GrokVideoPreviewDownloadsAuthenticatedContent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	account := &Account{
+		ID: 22, Name: "grok-oauth-video-preview", Platform: PlatformGrok,
+		Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token":  "grok-access-token",
+			"refresh_token": "grok-refresh-token",
+			"expires_at":    time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339),
+		},
+	}
+	repo := &mockAccountRepoForGemini{accountsByID: map[int64]*Account{account.ID: account}}
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusAccepted,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"request_id":"video-22"}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"status":"done","video":{"url":"https://vidgen.x.ai/video-22.mp4"}}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"video/mp4"}},
+			Body:       io.NopCloser(strings.NewReader("fake-mp4")),
+		},
+	}}
+	svc := &AccountTestService{
+		accountRepo:       repo,
+		grokTokenProvider: NewGrokTokenProvider(repo, nil),
+		httpUpstream:      upstream,
+	}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/22/test", nil)
+
+	err := svc.TestAccountConnection(c, account.ID, "grok-imagine-video-1.5", "A simple beach scene", AccountTestModeGrokVideo)
+
+	require.NoError(t, err)
+	require.Len(t, upstream.requests, 3)
+	require.Equal(t, "/v1/videos/video-22/content", upstream.requests[2].URL.Path)
+	require.Contains(t, rec.Body.String(), `"video_url":"data:video/mp4;base64,ZmFrZS1tcDQ="`)
+	require.NotContains(t, rec.Body.String(), "vidgen.x.ai/video-22.mp4")
+}
+
 type grokRealtimeTestConn struct {
 	msg []byte
 }

@@ -1729,7 +1729,10 @@ func (s *AccountTestService) testGrokVideoGeneration(c *gin.Context, ctx context
 	return s.sendErrorAndEnd(c, "Grok video still processing after 60s (request_id="+requestID+")")
 }
 
-// emitGrokVideoResult surfaces a playable video URL or downloads /content as data URL.
+// emitGrokVideoResult downloads completed video content for the admin preview.
+// The status URL is an upstream temporary link and may not be playable in the
+// browser because of range, hotlink, or proxy restrictions, so it is only a
+// fallback after the authenticated content endpoint fails.
 func (s *AccountTestService) emitGrokVideoResult(c *gin.Context, ctx context.Context, account *Account, authToken, requestID string, statusBody []byte) error {
 	videoURL := firstNonEmpty(
 		strings.TrimSpace(gjson.GetBytes(statusBody, "video.url").String()),
@@ -1737,53 +1740,55 @@ func (s *AccountTestService) emitGrokVideoResult(c *gin.Context, ctx context.Con
 		strings.TrimSpace(gjson.GetBytes(statusBody, "video_url").String()),
 		strings.TrimSpace(gjson.GetBytes(statusBody, "download_url").String()),
 	)
-	if videoURL != "" && (strings.HasPrefix(videoURL, "http://") || strings.HasPrefix(videoURL, "https://") || strings.HasPrefix(videoURL, "data:")) {
-		s.sendEvent(c, TestEvent{Type: "content", Text: "video ready: " + videoURL + "\n"})
+	if videoURL != "" && strings.HasPrefix(videoURL, "data:") {
+		s.sendEvent(c, TestEvent{Type: "content", Text: "video ready as inline data\n"})
 		s.sendEvent(c, TestEvent{Type: "video", VideoURL: videoURL, MimeType: "video/mp4"})
 		s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 		return nil
 	}
 
-	// Fetch binary content via official /videos/{id}/content (Bearer-authenticated).
+	// Prefer the authenticated content endpoint so the browser does not need to
+	// fetch the upstream temporary URL directly.
 	contentURL, err := buildGrokMediaURL(account, s.cfg, GrokMediaEndpointVideoContent, requestID)
-	if err != nil {
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Grok video content URL: %s", err.Error()))
-	}
-	s.sendEvent(c, TestEvent{Type: "status", Text: "Downloading video content for preview..."})
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, contentURL, nil)
-	if err != nil {
-		return s.sendErrorAndEnd(c, "Failed to create Grok video content request")
-	}
-	s.applyGrokTestRequestHeaders(req, account, authToken, "video/*, application/octet-stream, */*")
-	resp, err := s.httpUpstream.Do(req, s.grokTestProxyURL(account), account.ID, account.Concurrency)
-	if err != nil {
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content download failed: %s", err.Error()))
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap for admin preview
-	if resp.StatusCode != http.StatusOK {
-		// Fall back to status URL when binary content is unavailable.
-		if videoURL != "" {
-			s.sendEvent(c, TestEvent{Type: "content", Text: "video completed; content download unavailable, reported url=" + videoURL + "\n"})
-			s.sendEvent(c, TestEvent{Type: "video", VideoURL: videoURL, MimeType: "video/mp4"})
-			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-			return nil
+	if err == nil {
+		s.sendEvent(c, TestEvent{Type: "status", Text: "Downloading video content for preview..."})
+		req, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, contentURL, nil)
+		if requestErr == nil {
+			s.applyGrokTestRequestHeaders(req, account, authToken, "video/*, application/octet-stream, */*")
+			resp, requestErr := s.httpUpstream.Do(req, s.grokTestProxyURL(account), account.ID, account.Concurrency)
+			if requestErr == nil {
+				body, readErr := io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap for admin preview
+				_ = resp.Body.Close()
+				if readErr == nil && resp.StatusCode == http.StatusOK && len(body) > 0 {
+					ct := strings.TrimSpace(resp.Header.Get("Content-Type"))
+					if i := strings.Index(ct, ";"); i >= 0 {
+						ct = strings.TrimSpace(ct[:i])
+					}
+					if ct == "" || ct == "application/octet-stream" {
+						ct = "video/mp4"
+					}
+					if strings.HasPrefix(ct, "video/") {
+						dataURL := "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(body)
+						s.sendEvent(c, TestEvent{Type: "content", Text: fmt.Sprintf("video content downloaded: content-type=%s bytes=%d\n", ct, len(body))})
+						s.sendEvent(c, TestEvent{Type: "video", VideoURL: dataURL, MimeType: ct})
+						s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+						return nil
+					}
+				}
+			}
 		}
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content returned %d: %s", resp.StatusCode, truncateString(string(body), 300)))
 	}
-	ct := resp.Header.Get("Content-Type")
-	if ct == "" || strings.HasPrefix(ct, "application/octet-stream") {
-		ct = "video/mp4"
+
+	// Keep the upstream URL as a compatibility fallback when the content
+	// endpoint is unavailable. The normal path above avoids this browser issue.
+	if videoURL != "" && (strings.HasPrefix(videoURL, "http://") || strings.HasPrefix(videoURL, "https://")) {
+		s.sendEvent(c, TestEvent{Type: "content", Text: "video content download unavailable; using upstream URL fallback\n"})
+		s.sendEvent(c, TestEvent{Type: "video", VideoURL: videoURL, MimeType: "video/mp4"})
+		s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+		return nil
 	}
-	// Keep only type/subtype for data URL.
-	if i := strings.Index(ct, ";"); i >= 0 {
-		ct = strings.TrimSpace(ct[:i])
-	}
-	dataURL := "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(body)
-	s.sendEvent(c, TestEvent{Type: "content", Text: fmt.Sprintf("video content downloaded: content-type=%s bytes=%d\n", ct, len(body))})
-	s.sendEvent(c, TestEvent{Type: "video", VideoURL: dataURL, MimeType: ct})
-	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-	return nil
+
+	return s.sendErrorAndEnd(c, "Grok video completed without a playable video URL")
 }
 
 func (s *AccountTestService) testGrokWebSearch(c *gin.Context, ctx context.Context, account *Account, authToken, query string) error {
