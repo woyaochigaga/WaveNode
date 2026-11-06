@@ -10,14 +10,14 @@
       </div>
 
       <div class="flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-        <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="flex h-10 w-10 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" :title="t('home.viewDocs')">
+        <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="flex h-10 w-10 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" :title="t('home.viewDocs')" :aria-label="t('home.viewDocs')">
           <Icon name="book" size="md" />
         </a>
         <router-link v-if="showModelPlazaEntry" to="/model-plaza" class="flex h-10 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" :title="t('nav.modelPlaza')">
           <Icon name="grid" size="md" />
           <span class="hidden sm:inline">{{ t('nav.modelPlaza') }}</span>
         </router-link>
-        <button type="button" class="flex h-10 w-10 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" :title="isDark ? t('home.switchToLight') : t('home.switchToDark')" @click="emit('toggle-theme')">
+        <button type="button" class="flex h-10 w-10 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-white" :title="isDark ? t('home.switchToLight') : t('home.switchToDark')" :aria-label="isDark ? t('home.switchToLight') : t('home.switchToDark')" @click="emit('toggle-theme')">
           <Icon v-if="isDark" name="sun" size="md" />
           <Icon v-else name="moon" size="md" />
         </button>

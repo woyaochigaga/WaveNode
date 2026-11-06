@@ -12,6 +12,13 @@
       </div>
       <!-- Login Form -->
       <form @submit.prevent="handleLogin" class="space-y-5">
+        <p
+          v-if="errorMessage"
+          role="alert"
+          class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {{ errorMessage }}
+        </p>
         <!-- Email Input -->
         <div>
           <label for="email" class="input-label">
@@ -31,9 +38,14 @@
               :disabled="authActionDisabled"
               class="input pl-11"
               :class="{ 'input-error': errors.email }"
+              :aria-invalid="Boolean(errors.email)"
+              :aria-describedby="errors.email ? 'login-email-error' : undefined"
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
+          <p v-if="errors.email" id="login-email-error" class="input-error-text" role="alert">
+            {{ errors.email }}
+          </p>
         </div>
 
         <!-- Password Input -->
@@ -54,6 +66,8 @@
               :disabled="authActionDisabled"
               class="input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
+              :aria-invalid="Boolean(errors.password)"
+              :aria-describedby="errors.password ? 'login-password-error' : undefined"
               :placeholder="t('auth.passwordPlaceholder')"
             />
             <button
@@ -61,6 +75,8 @@
               @click="showPassword = !showPassword"
               :disabled="authActionDisabled"
               class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              :aria-label="showPassword ? t('common.hidePassword') : t('common.showPassword')"
+              :aria-pressed="showPassword"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
@@ -79,7 +95,7 @@
         </div>
 
         <!-- Turnstile Widget -->
-        <div v-if="captchaEnabled">
+          <div v-if="captchaEnabled">
           <TurnstileWidget
             ref="turnstileRef"
             :turnstile-enabled="turnstileEnabled"
@@ -95,7 +111,10 @@
             @expire="onTurnstileExpire"
             @error="onTurnstileError"
           />
-        </div>
+          </div>
+          <p v-if="errors.turnstile" id="login-captcha-error" class="input-error-text" role="alert">
+            {{ errors.turnstile }}
+          </p>
 
         <!-- Submit Button -->
         <button

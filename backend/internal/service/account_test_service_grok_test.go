@@ -622,6 +622,86 @@ func TestAccountTestService_GrokVideoPreviewDownloadsAuthenticatedContent(t *tes
 	require.NotContains(t, rec.Body.String(), "vidgen.x.ai/video-22.mp4")
 }
 
+// fixedByteReader lets the oversized-preview test exceed the limit without
+// allocating a second full video buffer in the test process.
+type fixedByteReader struct {
+	remaining int64
+}
+
+func (r *fixedByteReader) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		return 0, io.EOF
+	}
+	n := len(p)
+	if int64(n) > r.remaining {
+		n = int(r.remaining)
+	}
+	for i := 0; i < n; i++ {
+		p[i] = 'x'
+	}
+	r.remaining -= int64(n)
+	return n, nil
+}
+
+func TestAccountTestService_GrokVideoPreviewRejectsOversizedContent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	account := &Account{
+		ID: 23, Name: "grok-oauth-video-large", Platform: PlatformGrok,
+		Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token":  "grok-access-token",
+			"refresh_token": "grok-refresh-token",
+			"expires_at":    time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339),
+		},
+	}
+	repo := &mockAccountRepoForGemini{accountsByID: map[int64]*Account{account.ID: account}}
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{StatusCode: http.StatusAccepted, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"request_id":"video-23"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"status":"done","video":{"url":"https://vidgen.x.ai/video-23.mp4"}}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"video/mp4"}}, Body: io.NopCloser(&fixedByteReader{remaining: int64(grokVideoPreviewMaxBytes) + 1})},
+	}}
+	svc := &AccountTestService{accountRepo: repo, grokTokenProvider: NewGrokTokenProvider(repo, nil), httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/23/test", nil)
+
+	err := svc.TestAccountConnection(c, account.ID, "grok-imagine-video-1.5", "A simple beach scene", AccountTestModeGrokVideo)
+
+	require.Error(t, err)
+	require.Contains(t, rec.Body.String(), "exceeds the 64 MiB preview limit")
+	require.NotContains(t, rec.Body.String(), `"success":true`)
+}
+
+func TestAccountTestService_GrokVideoPreviewDoesNotFallbackToUpstreamURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	account := &Account{
+		ID: 24, Name: "grok-oauth-video-download-fail", Platform: PlatformGrok,
+		Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token":  "grok-access-token",
+			"refresh_token": "grok-refresh-token",
+			"expires_at":    time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339),
+		},
+	}
+	repo := &mockAccountRepoForGemini{accountsByID: map[int64]*Account{account.ID: account}}
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{StatusCode: http.StatusAccepted, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"request_id":"video-24"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"status":"done","video":{"url":"https://vidgen.x.ai/video-24.mp4"}}`))},
+		{StatusCode: http.StatusForbidden, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"error":"expired content URL"}`))},
+	}}
+	svc := &AccountTestService{accountRepo: repo, grokTokenProvider: NewGrokTokenProvider(repo, nil), httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/24/test", nil)
+
+	err := svc.TestAccountConnection(c, account.ID, "grok-imagine-video-1.5", "A simple beach scene", AccountTestModeGrokVideo)
+
+	require.Error(t, err)
+	require.Contains(t, rec.Body.String(), "Grok video content returned HTTP 403")
+	require.NotContains(t, rec.Body.String(), "video_url")
+	require.NotContains(t, rec.Body.String(), `"success":true`)
+}
+
 type grokRealtimeTestConn struct {
 	msg []byte
 }

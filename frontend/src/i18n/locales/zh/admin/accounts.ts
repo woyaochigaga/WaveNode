@@ -1642,6 +1642,7 @@ export default {
       audioReceived: '已收到第 {count} 段测试音频',
       videoPreview: '生成视频：',
       videoReceived: '已收到第 {count} 段测试视频',
+      videoPreviewError: '视频预览加载失败，请重试或检查上游视频内容。',
       testSummary: {
         stage: '检测阶段',
         latency: '总耗时',

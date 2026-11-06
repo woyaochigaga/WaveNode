@@ -48,6 +48,8 @@ const (
 	testClaudeAPIURL            = "https://api.anthropic.com/v1/messages?beta=true"
 	chatgptCodexAPIURL          = "https://chatgpt.com/backend-api/codex/responses"
 	defaultAntigravityTestModel = "claude-sonnet-4-6"
+	// Grok 视频测试预览使用内存 data URL，限制大小避免管理端测试占满服务内存。
+	grokVideoPreviewMaxBytes = 64 << 20
 )
 
 // TestEvent represents a SSE event for account testing
@@ -1731,8 +1733,8 @@ func (s *AccountTestService) testGrokVideoGeneration(c *gin.Context, ctx context
 
 // emitGrokVideoResult downloads completed video content for the admin preview.
 // The status URL is an upstream temporary link and may not be playable in the
-// browser because of range, hotlink, or proxy restrictions, so it is only a
-// fallback after the authenticated content endpoint fails.
+// browser because of range, hotlink, or proxy restrictions. Always download it
+// through the authenticated content endpoint before reporting success.
 func (s *AccountTestService) emitGrokVideoResult(c *gin.Context, ctx context.Context, account *Account, authToken, requestID string, statusBody []byte) error {
 	videoURL := firstNonEmpty(
 		strings.TrimSpace(gjson.GetBytes(statusBody, "video.url").String()),
@@ -1750,45 +1752,56 @@ func (s *AccountTestService) emitGrokVideoResult(c *gin.Context, ctx context.Con
 	// Prefer the authenticated content endpoint so the browser does not need to
 	// fetch the upstream temporary URL directly.
 	contentURL, err := buildGrokMediaURL(account, s.cfg, GrokMediaEndpointVideoContent, requestID)
-	if err == nil {
-		s.sendEvent(c, TestEvent{Type: "status", Text: "Downloading video content for preview..."})
-		req, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, contentURL, nil)
-		if requestErr == nil {
-			s.applyGrokTestRequestHeaders(req, account, authToken, "video/*, application/octet-stream, */*")
-			resp, requestErr := s.httpUpstream.Do(req, s.grokTestProxyURL(account), account.ID, account.Concurrency)
-			if requestErr == nil {
-				body, readErr := io.ReadAll(io.LimitReader(resp.Body, 64<<20)) // 64 MiB cap for admin preview
-				_ = resp.Body.Close()
-				if readErr == nil && resp.StatusCode == http.StatusOK && len(body) > 0 {
-					ct := strings.TrimSpace(resp.Header.Get("Content-Type"))
-					if i := strings.Index(ct, ";"); i >= 0 {
-						ct = strings.TrimSpace(ct[:i])
-					}
-					if ct == "" || ct == "application/octet-stream" {
-						ct = "video/mp4"
-					}
-					if strings.HasPrefix(ct, "video/") {
-						dataURL := "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(body)
-						s.sendEvent(c, TestEvent{Type: "content", Text: fmt.Sprintf("video content downloaded: content-type=%s bytes=%d\n", ct, len(body))})
-						s.sendEvent(c, TestEvent{Type: "video", VideoURL: dataURL, MimeType: ct})
-						s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-						return nil
-					}
-				}
-			}
-		}
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content URL unavailable: %s", err.Error()))
+	}
+	s.sendEvent(c, TestEvent{Type: "status", Text: "Downloading video content for preview..."})
+	req, requestErr := http.NewRequestWithContext(ctx, http.MethodGet, contentURL, nil)
+	if requestErr != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content request failed: %s", requestErr.Error()))
+	}
+	s.applyGrokTestRequestHeaders(req, account, authToken, "video/*, application/octet-stream, */*")
+	resp, requestErr := s.httpUpstream.Do(req, s.grokTestProxyURL(account), account.ID, account.Concurrency)
+	if requestErr != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content download failed: %s", requestErr.Error()))
+	}
+	if resp == nil {
+		return s.sendErrorAndEnd(c, "Grok video content download returned an empty response")
+	}
+	defer resp.Body.Close()
+
+	// Read one byte beyond the limit so an oversized response cannot be silently
+	// truncated into a corrupt data URL and incorrectly marked as successful.
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, grokVideoPreviewMaxBytes+1))
+	if readErr != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content read failed: %s", readErr.Error()))
+	}
+	if len(body) > grokVideoPreviewMaxBytes {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content exceeds the %d MiB preview limit", grokVideoPreviewMaxBytes>>20))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content returned HTTP %d", resp.StatusCode))
+	}
+	if len(body) == 0 {
+		return s.sendErrorAndEnd(c, "Grok video content response is empty")
 	}
 
-	// Keep the upstream URL as a compatibility fallback when the content
-	// endpoint is unavailable. The normal path above avoids this browser issue.
-	if videoURL != "" && (strings.HasPrefix(videoURL, "http://") || strings.HasPrefix(videoURL, "https://")) {
-		s.sendEvent(c, TestEvent{Type: "content", Text: "video content download unavailable; using upstream URL fallback\n"})
-		s.sendEvent(c, TestEvent{Type: "video", VideoURL: videoURL, MimeType: "video/mp4"})
-		s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-		return nil
+	ct := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if i := strings.Index(ct, ";"); i >= 0 {
+		ct = strings.TrimSpace(ct[:i])
+	}
+	if ct == "" || ct == "application/octet-stream" {
+		ct = "video/mp4"
+	}
+	if !strings.HasPrefix(ct, "video/") {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok video content returned unsupported type %q", ct))
 	}
 
-	return s.sendErrorAndEnd(c, "Grok video completed without a playable video URL")
+	dataURL := "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(body)
+	s.sendEvent(c, TestEvent{Type: "content", Text: fmt.Sprintf("video content downloaded: content-type=%s bytes=%d\n", ct, len(body))})
+	s.sendEvent(c, TestEvent{Type: "video", VideoURL: dataURL, MimeType: ct})
+	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+	return nil
 }
 
 func (s *AccountTestService) testGrokWebSearch(c *gin.Context, ctx context.Context, account *Account, authToken, query string) error {

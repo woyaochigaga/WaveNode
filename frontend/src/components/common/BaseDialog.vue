@@ -14,6 +14,8 @@
         <div
           ref="dialogRef"
           :class="['modal-content', 'max-w-[calc(100vw-1rem)] overflow-x-hidden', widthClasses]"
+          tabindex="-1"
+          @keydown="handleDialogKeydown"
           @click.stop
         >
           <!-- Header -->
@@ -25,7 +27,7 @@
               v-if="showCloseButton"
               @click="emit('close')"
               class="-mr-2 rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 focus-visible:ring-offset-2 dark:text-dark-500 dark:hover:bg-dark-700 dark:hover:text-dark-300 dark:focus-visible:ring-offset-dark-900"
-              aria-label="Close modal"
+              :aria-label="t('common.close')"
             >
               <Icon name="x" size="md" />
             </button>
@@ -53,10 +55,12 @@ const openDialogs = new Set<string>()
 
 <script setup lang="ts">
 import { computed, watch, onMounted, onUnmounted, ref, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
 // 生成唯一ID以避免多个对话框时ID冲突
 const dialogId = `modal-title-${++dialogIdCounter}`
+const { t } = useI18n()
 
 // 焦点管理
 const dialogRef = ref<HTMLElement | null>(null)
@@ -117,6 +121,34 @@ const handleClose = () => {
 const handleEscape = (event: KeyboardEvent) => {
   if (props.show && props.closeOnEscape && event.key === 'Escape') {
     emit('close')
+  }
+}
+
+const focusableSelector =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+// 将键盘焦点限制在当前弹窗内，避免 Tab 穿透到被 aria-modal 隐藏的页面。
+const handleDialogKeydown = (event: KeyboardEvent) => {
+  if (!props.show || event.key !== 'Tab' || !dialogRef.value) return
+
+  const focusableElements = Array.from(
+    dialogRef.value.querySelectorAll<HTMLElement>(focusableSelector)
+  ).filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true')
+
+  if (focusableElements.length === 0) {
+    event.preventDefault()
+    dialogRef.value.focus()
+    return
+  }
+
+  const first = focusableElements[0]
+  const last = focusableElements[focusableElements.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
   }
 }
 

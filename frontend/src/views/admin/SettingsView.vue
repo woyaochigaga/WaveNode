@@ -8678,7 +8678,7 @@
 
 <script setup lang="ts">
 import SettingHelp from "@/components/admin/SettingHelp.vue";
-import { ref, reactive, computed, onMounted, watch } from "vue";
+import { defineAsyncComponent, ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api";
 import {
@@ -8732,9 +8732,6 @@ import GroupOptionItem from "@/components/common/GroupOptionItem.vue";
 import Toggle from "@/components/common/Toggle.vue";
 import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
-import BackupSettings from "@/views/admin/BackupView.vue";
-import OfficialPricesSettings from "@/views/admin/settings/OfficialPricesSettings.vue";
-import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
 import OpenAIFastPolicyUserSelector from "@/views/admin/settings/OpenAIFastPolicyUserSelector.vue";
 import { useClipboard } from "@/composables/useClipboard";
 import {
@@ -8761,6 +8758,11 @@ import {
   defaultFingerprintSignalRows,
   type FingerprintSignalRow,
 } from "./codexFingerprintSignals";
+
+// 设置页按标签页延迟加载体积较大的独立模块，减少初始 JavaScript 下载量。
+const BackupSettings = defineAsyncComponent(() => import("@/views/admin/BackupView.vue"));
+const OfficialPricesSettings = defineAsyncComponent(() => import("@/views/admin/settings/OfficialPricesSettings.vue"));
+const EmailTemplateEditor = defineAsyncComponent(() => import("@/views/admin/settings/EmailTemplateEditor.vue"));
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();

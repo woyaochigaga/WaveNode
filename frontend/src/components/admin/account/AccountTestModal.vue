@@ -337,7 +337,16 @@
           :key="`video-${index}`"
           class="overflow-hidden rounded-xl border border-gray-200 bg-black dark:border-dark-500"
         >
-          <video :src="video.url" controls class="max-h-[360px] w-full" :type="video.mimeType" />
+          <video
+            :src="video.url"
+            controls
+            class="max-h-[360px] w-full"
+            :type="video.mimeType"
+            @error="markVideoError(index)"
+          />
+          <div v-if="videoErrors[index]" class="border-t border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+            {{ videoErrors[index] }}
+          </div>
           <div class="border-t border-gray-100 bg-white px-3 py-1.5 text-xs text-gray-500 dark:border-dark-500 dark:bg-dark-700 dark:text-gray-300">
             {{ video.mimeType || 'video/*' }}
           </div>
@@ -477,6 +486,7 @@ let abortController: AbortController | null = null
 const generatedImages = ref<PreviewMedia[]>([])
 const generatedAudios = ref<PreviewMedia[]>([])
 const generatedVideos = ref<PreviewMedia[]>([])
+const videoErrors = ref<Record<number, string>>({})
 const previewImageUrl = ref('')
 const testMode = ref<'default' | 'compact'>('default')
 const grokTestMode = ref<'text' | 'image' | 'video' | 'search' | 'tts' | 'stt' | 'realtime'>('text')
@@ -864,7 +874,13 @@ const resetState = () => {
   generatedImages.value = []
   generatedAudios.value = []
   generatedVideos.value = []
+  videoErrors.value = {}
   previewImageUrl.value = ''
+}
+
+// 视频地址失效或浏览器不支持编码时，给管理员明确反馈，避免只看到空黑框。
+const markVideoError = (index: number) => {
+  videoErrors.value[index] = t('admin.accounts.videoPreviewError')
 }
 
 const handleClose = () => {

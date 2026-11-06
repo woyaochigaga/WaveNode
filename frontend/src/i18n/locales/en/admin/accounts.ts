@@ -1555,6 +1555,7 @@ export default {
       audioReceived: 'Received test audio #{count}',
       videoPreview: 'Generated video:',
       videoReceived: 'Received test video #{count}',
+      videoPreviewError: 'Video preview failed to load. Retry or check the upstream video content.',
       testSummary: {
         stage: 'Stage',
         latency: 'Duration',

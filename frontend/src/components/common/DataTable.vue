@@ -53,7 +53,11 @@
           'cursor-pointer': clickableRows,
           'border-primary-300 bg-primary-50/40 dark:border-primary-700 dark:bg-primary-900/10': selectable && isRowSelected(row, index)
         }"
+        :tabindex="clickableRows ? 0 : undefined"
+        :aria-label="clickableRows ? getRowActionLabel(row, index) : undefined"
         @click="clickableRows && emit('rowClick', row)"
+        @keydown.enter.prevent="clickableRows && emit('rowClick', row)"
+        @keydown.space.prevent="clickableRows && emit('rowClick', row)"
       >
         <div class="space-y-3">
           <div v-if="selectable" class="flex justify-end">
@@ -129,7 +133,10 @@
               getStickyColumnClass(column, index),
               column.class
             ]"
+            :tabindex="column.sortable ? 0 : undefined"
             @click="column.sortable && handleSort(column.key)"
+            @keydown.enter.prevent="column.sortable && handleSort(column.key)"
+            @keydown.space.prevent="column.sortable && handleSort(column.key)"
           >
             <div :class="['flex items-center space-x-1', getHeaderContentAlignmentClass(column)]">
               <slot
@@ -218,7 +225,11 @@
               'cursor-pointer': clickableRows,
               'bg-primary-50/40 dark:bg-primary-900/10': selectable && isRowSelected(item.row, item.index)
             }"
+            :tabindex="clickableRows ? 0 : undefined"
+            :aria-label="clickableRows ? getRowActionLabel(item.row, item.index) : undefined"
             @click="clickableRows && emit('rowClick', item.row)"
+            @keydown.enter.prevent="clickableRows && emit('rowClick', item.row)"
+            @keydown.space.prevent="clickableRows && emit('rowClick', item.row)"
           >
             <td v-if="selectable" class="w-11 min-w-11 px-3 py-4 text-center">
               <input
@@ -731,6 +742,16 @@ const getRowSelectionLabel = (row: any, index: number) => {
   if (typeof props.selectionLabel === 'function') return props.selectionLabel(row)
   if (props.selectionLabel) return props.selectionLabel
   return `${t('common.selectOption')} ${resolveRowKey(row, index)}`
+}
+
+// 为键盘聚焦的整行提供上下文，避免屏幕阅读器只读出一段无意义的表格内容。
+const getRowActionLabel = (row: any, index: number) => {
+  const firstColumn = dataColumns.value[0]
+  const value = firstColumn?.formatter
+    ? firstColumn.formatter(row?.[firstColumn.key], row)
+    : row?.[firstColumn?.key ?? '']
+  const context = value === null || value === undefined || value === '' ? resolveRowKey(row, index) : String(value)
+  return `${t('common.openRow')} ${context}`
 }
 
 const toggleRowSelection = (row: any, index: number, checked: boolean) => {

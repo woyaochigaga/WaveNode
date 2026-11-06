@@ -7,6 +7,8 @@
           @click="toggleMobileSidebar"
           class="btn-ghost btn-icon lg:hidden"
           :aria-label="t('common.toggleMenu')"
+          :aria-expanded="appStore.mobileOpen"
+          aria-controls="app-sidebar"
         >
           <Icon name="menu" size="md" />
         </button>
@@ -59,7 +61,10 @@
         <!-- Balance Display -->
         <div
           v-if="user"
-          class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
+          class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 dark:bg-primary-900/20 sm:flex"
+          tabindex="0"
+          role="group"
+          :aria-label="`${balanceAvailableText}: ${formatHeaderMoney(availableBalance)}`"
         >
           <Icon name="points" size="sm" class="text-primary-600 dark:text-primary-400" />
           <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
@@ -72,7 +77,7 @@
             {{ balanceFrozenLabel }}
           </span>
           <div
-            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block dark:border-dark-700 dark:bg-dark-800"
+            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block group-focus-within:block dark:border-dark-700 dark:bg-dark-800"
           >
             <div class="flex items-center justify-between">
               <span class="text-gray-500 dark:text-dark-400">{{ balanceAvailableText }}</span>
@@ -94,9 +99,13 @@
         <!-- User Dropdown -->
         <div v-if="user" class="relative" ref="dropdownRef">
           <button
+            ref="userMenuButtonRef"
             @click="toggleDropdown"
             class="flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
             :aria-label="t('common.userMenu')"
+            :aria-expanded="dropdownOpen"
+            aria-haspopup="menu"
+            aria-controls="user-menu"
           >
             <div class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
               <img
@@ -120,7 +129,7 @@
 
           <!-- Dropdown Menu -->
           <transition name="dropdown">
-            <div v-if="dropdownOpen" class="dropdown right-0 mt-2 w-56">
+            <div v-if="dropdownOpen" id="user-menu" class="dropdown right-0 mt-2 w-56" role="menu">
               <!-- User Info -->
               <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700">
                 <div class="text-sm font-medium text-gray-900 dark:text-white">
@@ -143,12 +152,12 @@
               </div>
 
               <div class="py-1">
-                <router-link to="/profile" @click="closeDropdown" class="dropdown-item">
+                <router-link to="/profile" @click="closeDropdown" class="dropdown-item" role="menuitem">
                   <Icon name="user" size="sm" />
                   {{ t('nav.profile') }}
                 </router-link>
                 <!-- 管理入口随账户菜单展示，普通用户不显示。 -->
-                <router-link v-if="authStore.isAdmin" to="/admin/settings" @click="closeDropdown" class="dropdown-item">
+                <router-link v-if="authStore.isAdmin" to="/admin/settings" @click="closeDropdown" class="dropdown-item" role="menuitem">
                   <Icon name="cog" size="sm" />
                   {{ t('nav.settings') }}
                 </router-link>
@@ -181,7 +190,7 @@
               </div>
 
               <div v-if="showOnboardingButton" class="border-t border-gray-100 py-1 dark:border-dark-700">
-                <button @click="handleReplayGuide" class="dropdown-item w-full">
+                <button @click="handleReplayGuide" class="dropdown-item w-full" role="menuitem">
                   <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <path
                       d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 14a1 1 0 110 2 1 1 0 010-2zm1.07-7.75c0-.6-.49-1.25-1.32-1.25-.7 0-1.22.4-1.43 1.02a1 1 0 11-1.9-.62A3.41 3.41 0 0111.8 5c2.02 0 3.25 1.4 3.25 2.9 0 2-1.83 2.55-2.43 3.12-.43.4-.47.75-.47 1.23a1 1 0 01-2 0c0-1 .16-1.82 1.1-2.7.69-.64 1.82-1.05 1.82-2.06z"
@@ -195,6 +204,7 @@
                 <button
                   @click="handleLogout"
                   class="dropdown-item w-full text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  role="menuitem"
                 >
                   <svg
                     class="h-4 w-4"
@@ -221,7 +231,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
@@ -247,6 +257,7 @@ const onboardingStore = useOnboardingStore()
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const userMenuButtonRef = ref<HTMLButtonElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
@@ -327,6 +338,20 @@ function closeDropdown() {
   dropdownOpen.value = false
 }
 
+// 打开菜单后把焦点交给第一项，Esc 关闭后还原到触发按钮。
+watch(dropdownOpen, async (open) => {
+  if (!open) return
+  await nextTick()
+  dropdownRef.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+})
+
+function handleDropdownKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && dropdownOpen.value) {
+    closeDropdown()
+    userMenuButtonRef.value?.focus()
+  }
+}
+
 async function handleLogout() {
   closeDropdown()
   try {
@@ -355,10 +380,12 @@ function handleClickOutside(event: MouseEvent) {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleDropdownKeydown)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleDropdownKeydown)
 })
 </script>
 

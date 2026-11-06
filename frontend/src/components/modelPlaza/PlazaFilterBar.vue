@@ -13,6 +13,7 @@
           class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 disabled:grayscale"
           :class="p === 'all' ? chipClass(platform === 'all') : platform === p ? 'chip-tinted-active' : 'chip-tinted'"
           :style="p === 'all' ? undefined : { '--chip-accent': platformAccentColor(p) }"
+          :aria-pressed="p === 'all' ? platform === 'all' : platform === p"
           :disabled="p !== 'all' && !platformEnabled(p)"
           @click="$emit('update:platform', p)"
         >
@@ -32,6 +33,7 @@
           type="button"
           class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
           :class="chipClass(groupId === 'all')"
+          :aria-pressed="groupId === 'all'"
           @click="$emit('update:groupId', 'all')"
         >
           {{ t('modelPlaza.filters.all') }}
@@ -43,6 +45,7 @@
           class="rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 disabled:grayscale"
           :class="groupId === g.id ? 'chip-tinted-active' : 'chip-tinted'"
           :style="{ '--chip-accent': platformAccentColor(g.platform) }"
+          :aria-pressed="groupId === g.id"
           :disabled="!groupEnabled(g)"
           @click="$emit('update:groupId', g.id)"
         >
@@ -61,6 +64,7 @@
           type="button"
           class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
           :class="chipClass(rate === 'all')"
+          :aria-pressed="rate === 'all'"
           @click="$emit('update:rate', 'all')"
         >
           {{ t('modelPlaza.filters.all') }}
@@ -71,6 +75,7 @@
           type="button"
           class="rounded-lg px-3 py-1.5 font-mono text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 disabled:grayscale"
           :class="chipClass(rate === r)"
+          :aria-pressed="rate === r"
           :disabled="!rateEnabled(r)"
           @click="$emit('update:rate', r)"
         >
@@ -102,6 +107,7 @@
           type="button"
           class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600 dark:text-dark-500 dark:hover:text-gray-300"
           @click="$emit('update:search', '')"
+          :aria-label="t('common.clear')"
         >
           <Icon name="x" size="xs" class="h-3.5 w-3.5" />
         </button>

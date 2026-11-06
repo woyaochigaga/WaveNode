@@ -20,6 +20,9 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | `apple-container.sh` | Native Apple `container` lifecycle script |
 | `APPLE_CONTAINER.md` | Apple `container` deployment and operations guide |
 | `.env.example` | Container environment variables template |
+| `.env.production.example` | Safer production `.env` starter template |
+| `publish-remote.sh` | Local rsync + remote health-checked release entrypoint |
+| `update-local.sh` | Remote build, health check, and image rollback script |
 | `DOCKER.md` | Docker Hub documentation |
 | `install.sh` | One-click binary installation script |
 | `install-datamanagementd.sh` | datamanagementd 一键安装脚本 |
@@ -66,10 +69,10 @@ chmod +x docker-deploy.sh
 
 **What the script does:**
 - Downloads `docker-compose.local.yml` and `.env.example`
-- Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
+- Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD, ADMIN_PASSWORD)
 - Creates `.env` file with generated secrets
 - Creates necessary data directories (data/, postgres_data/, redis_data/)
-- **Displays generated credentials** (POSTGRES_PASSWORD, JWT_SECRET, etc.)
+- Does not print generated secrets to the terminal; they remain in `.env`
 
 **After running the script:**
 ```bash
@@ -79,12 +82,36 @@ docker compose -f docker-compose.local.yml up -d
 # View logs
 docker compose -f docker-compose.local.yml logs -f sub2api
 
-# If admin password was auto-generated, find it in logs:
-docker compose -f docker-compose.local.yml logs sub2api | grep "admin password"
+# The generated admin password is stored in .env; read it locally when needed:
+grep '^ADMIN_PASSWORD=' .env
 
 # Access Web UI
 # http://localhost:8080
 ```
+
+### Production `.env` safety
+
+Do not put real secrets in Git, screenshots, chat messages, Docker image layers, or shell commands copied into public logs. For a reverse-proxy deployment, start from the production template and keep the application bound to localhost:
+
+```bash
+cp .env.production.example .env
+chmod 600 .env
+openssl rand -hex 32  # repeat for each CHANGE_ME value
+docker compose --env-file .env -f docker-compose.local.yml config --quiet
+```
+
+Keep `BIND_HOST=127.0.0.1` when Caddy/Nginx is on the same server. Set `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `ADMIN_PASSWORD`, `JWT_SECRET`, and `TOTP_ENCRYPTION_KEY` before the first start. Never replace the last two on a running installation unless you intentionally accept session and TOTP invalidation.
+
+### Publish with health check and rollback
+
+From the local repository, use the release wrapper instead of manually running `rsync` and `docker compose` separately:
+
+```bash
+chmod +x deploy/publish-remote.sh deploy/update-local.sh
+./deploy/publish-remote.sh root@your-server /opt/sub2api ~/.ssh/id_ed25519
+```
+
+The wrapper excludes `.env` and persistent data, validates the Compose file, builds the new image, waits for the container health check, and restores the previous image tag if the updated container becomes unhealthy. Image rollback cannot undo an already-applied database migration, so keep the existing database backup procedure for releases that change schema.
 
 ### Method 2: Manual Deployment
 
@@ -136,12 +163,12 @@ When using Docker Compose with `AUTO_SETUP=true`:
    - Connects to PostgreSQL and Redis
    - Applies database migrations (SQL files in `backend/migrations/*.sql`) and records them in `schema_migrations`
    - Generates JWT secret (if not provided)
-   - Creates admin account (password auto-generated if not provided)
+   - Creates admin account (the deployment script sets `ADMIN_PASSWORD` explicitly)
    - Writes config.yaml
 
 2. No manual Setup Wizard needed - just configure `.env` and start
 
-3. If `ADMIN_PASSWORD` is not set, check logs for the generated password:
+3. If an older installation has no `ADMIN_PASSWORD`, check logs for the generated password:
    ```bash
    docker compose logs sub2api | grep "admin password"
    ```
@@ -258,7 +285,7 @@ docker compose down -v
 | `TOTP_ENCRYPTION_KEY` | **Recommended** | *(auto-generated)* | TOTP encryption key (fixed for persistent 2FA) |
 | `SERVER_PORT` | No | `8080` | Server port |
 | `ADMIN_EMAIL` | No | `admin@sub2api.local` | Admin email |
-| `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password |
+| `ADMIN_PASSWORD` | **Recommended** | *(auto-generated)* | Admin password; set it explicitly so the initial credential is not only in logs |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
 | `UPDATE_GITHUB_TOKEN` | No | *(empty)* | Token for `api.github.com` release checks only; asset downloads remain anonymous. |
 | `GEMINI_OAUTH_CLIENT_ID` | No | *(builtin)* | Google OAuth client ID (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
@@ -268,7 +295,7 @@ docker compose down -v
 
 See `.env.example` for all available options.
 
-> **Note:** The `docker-deploy.sh` script automatically generates `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, and `POSTGRES_PASSWORD` for you.
+> **Note:** The `docker-deploy.sh` script automatically generates JWT, TOTP, PostgreSQL, Redis, and admin-password secrets for you and does not print their values.
 
 ### Easy Migration (Local Directory Version)
 

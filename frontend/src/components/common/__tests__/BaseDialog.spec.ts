@@ -34,4 +34,26 @@ describe('BaseDialog', () => {
     expect(document.body.querySelector<HTMLElement>('.modal-body')?.scrollTop).toBe(0)
     wrapper.unmount()
   })
+
+  it('keeps Tab focus inside the dialog', async () => {
+    const wrapper = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Details' },
+      slots: { default: '<input data-test="field" />' },
+      global: { stubs: { Icon: true } }
+    })
+    await nextTick()
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"] .modal-content')!
+    const closeButton = dialog.querySelector<HTMLButtonElement>('button')!
+    const field = dialog.querySelector<HTMLInputElement>('[data-test="field"]')!
+    field.focus()
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' }))
+    expect(document.activeElement).toBe(closeButton)
+
+    closeButton.focus()
+    dialog.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab', shiftKey: true }))
+    expect(document.activeElement).toBe(field)
+    wrapper.unmount()
+  })
 })

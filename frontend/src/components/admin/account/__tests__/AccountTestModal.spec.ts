@@ -221,6 +221,35 @@ describe('AccountTestModal', () => {
     })
   })
 
+  it('视频无法加载时展示明确的预览错误', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"video","video_url":"data:video/mp4;base64,invalid","mime_type":"video/mp4"}\n',
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 24,
+      name: 'Grok Video Account',
+      platform: 'grok',
+      type: 'oauth',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    expect(startButton).toBeTruthy()
+    await startButton!.trigger('click')
+    await flushPromises()
+
+    const video = wrapper.find('video')
+    expect(video.exists()).toBe(true)
+    await video.trigger('error')
+    expect(wrapper.text()).toContain('admin.accounts.videoPreviewError')
+  })
+
   it('接收 summary 事件后展示结构化失败原因和调度建议', async () => {
     global.fetch = vi.fn().mockResolvedValue(
       createStreamResponse([

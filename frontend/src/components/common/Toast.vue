@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      class="pointer-events-none fixed right-4 top-4 z-[9999] space-y-3"
+      class="pointer-events-none fixed left-4 right-4 top-4 z-[9999] space-y-3 sm:left-auto"
       aria-live="polite"
       aria-atomic="true"
     >
@@ -17,7 +17,7 @@
           v-for="toast in toasts"
           :key="toast.id"
           :class="[
-            'pointer-events-auto min-w-[320px] max-w-md overflow-hidden rounded-lg shadow-lg',
+            'pointer-events-auto w-full max-w-md overflow-hidden rounded-lg shadow-lg sm:min-w-[320px]',
             'bg-white dark:bg-dark-800',
             'border-l-4',
             getBorderColor(toast.type)
@@ -56,7 +56,7 @@
               <button
                 @click="removeToast(toast.id)"
                 class="-m-1 flex-shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-dark-700 dark:hover:text-gray-300"
-                aria-label="Close notification"
+                :aria-label="t('common.close')"
               >
                 <Icon name="x" size="sm" />
               </button>
@@ -78,10 +78,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
+const { t } = useI18n()
 
 const toasts = computed(() => appStore.toasts)
 

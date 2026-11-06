@@ -102,6 +102,25 @@ describe('DataTable', () => {
     expect(wrapper.findAll('tbody tr[aria-hidden="true"]')).toHaveLength(0)
   })
 
+  it('gives clickable rows an accessible action label and keyboard activation', async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        columns: [{ key: 'name', label: 'Name' }],
+        data: [{ id: 1, name: 'Alpha' }],
+        clickableRows: true
+      }
+    })
+
+    const row = wrapper.get('tbody tr[data-index]')
+    expect(row.attributes('tabindex')).toBe('0')
+    expect(row.attributes('aria-label')).toBe('common.openRow Alpha')
+
+    await row.trigger('keydown', { key: 'Enter' })
+    await row.trigger('keydown', { key: ' ' })
+
+    expect(wrapper.emitted('rowClick')).toHaveLength(2)
+  })
+
   it('switches to windowed rendering once row count exceeds virtualizeThreshold', async () => {
     const data = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}` }))
     const wrapper = mount(DataTable, {

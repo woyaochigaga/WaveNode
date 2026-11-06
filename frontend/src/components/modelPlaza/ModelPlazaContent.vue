@@ -28,9 +28,13 @@
     </div>
     <div
       v-else-if="error"
+      role="alert"
       class="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
     >
       {{ t('modelPlaza.loadFailed') }}
+      <button type="button" class="btn btn-secondary btn-sm mt-4" @click="emit('retry')">
+        {{ t('common.tryAgain') }}
+      </button>
     </div>
     <template v-else>
       <!-- 筛选区:平台 → 分组 → 倍率 -->
@@ -79,6 +83,10 @@ const props = defineProps<{
   error?: boolean
   /** 后台内嵌形态(AppLayout 内):隐藏页头。 */
   embedded?: boolean
+}>()
+
+const emit = defineEmits<{
+  retry: []
 }>()
 
 const { t } = useI18n()

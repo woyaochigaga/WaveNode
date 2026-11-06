@@ -1,5 +1,6 @@
 <template>
   <aside
+    id="app-sidebar"
     class="sidebar"
     :class="[
       sidebarCollapsed ? 'w-[72px]' : 'w-64',
@@ -67,6 +68,8 @@
                   'sidebar-link-collapsed': sidebarCollapsed
                 }"
                 :title="sidebarCollapsed ? item.label : undefined"
+                :aria-expanded="!sidebarCollapsed && isGroupExpanded(item)"
+                :aria-controls="sidebarCollapsed ? undefined : getGroupId(item)"
                 @click="handleGroupClick(item)"
               >
                 <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
@@ -83,7 +86,11 @@
                 </span>
               </button>
               <!-- Children -->
-              <div v-if="!sidebarCollapsed && isGroupExpanded(item)" class="mb-1 ml-4 border-l border-gray-200 pl-2 dark:border-dark-600">
+              <div
+                v-if="!sidebarCollapsed && isGroupExpanded(item)"
+                :id="getGroupId(item)"
+                class="mb-1 ml-4 border-l border-gray-200 pl-2 dark:border-dark-600"
+              >
                 <router-link
                   v-for="child in item.children"
                   :key="child.path"
@@ -176,6 +183,7 @@
         class="sidebar-link mb-2 w-full"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? (isDark ? t('nav.lightMode') : t('nav.darkMode')) : undefined"
+        :aria-label="isDark ? t('nav.lightMode') : t('nav.darkMode')"
       >
         <SunIcon v-if="isDark" class="h-5 w-5 flex-shrink-0 text-amber-500" />
         <MoonIcon v-else class="h-5 w-5 flex-shrink-0" />
@@ -190,6 +198,9 @@
         class="sidebar-link w-full"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? t('nav.expand') : t('nav.collapse')"
+        :aria-label="sidebarCollapsed ? t('nav.expand') : t('nav.collapse')"
+        aria-controls="app-sidebar"
+        :aria-expanded="!sidebarCollapsed"
       >
         <ChevronDoubleLeftIcon v-if="!sidebarCollapsed" class="h-5 w-5 flex-shrink-0" />
         <ChevronDoubleRightIcon v-else class="h-5 w-5 flex-shrink-0" />
@@ -920,6 +931,11 @@ function isGroupExpanded(item: NavItem): boolean {
   const override = groupExpandOverrides.value.get(item.path)
   if (override !== undefined) return override
   return isGroupActive(item)
+}
+
+// 使用路由生成稳定且安全的 DOM id，供折叠按钮关联子菜单。
+function getGroupId(item: NavItem): string {
+  return `sidebar-group-${item.path.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 }
 
 function toggleGroup(item: NavItem) {
