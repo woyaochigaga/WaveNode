@@ -70,5 +70,8 @@ declare module 'vue-router' {
      * i18n key for the page description
      */
     descriptionKey?: string
+
+    /** 是否允许搜索引擎收录；私有页和认证回调页默认不收录。 */
+    seoIndexable?: boolean
   }
 }

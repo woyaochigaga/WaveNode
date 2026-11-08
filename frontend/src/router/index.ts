@@ -12,6 +12,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { applyRouteSEO } from './seo'
 
 /**
  * Route definitions with lazy loading
@@ -35,7 +36,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/HomeView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Home'
+      title: 'Home',
+      titleKey: 'home.heroSubtitle',
+      descriptionKey: 'home.heroDescription',
+      seoIndexable: true
     }
   },
   {
@@ -171,7 +175,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/public/LegalDocumentView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Legal Document'
+      title: 'Legal Document',
+      seoIndexable: true
     }
   },
   {
@@ -181,7 +186,9 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Model Plaza',
-      titleKey: 'modelPlaza.title'
+      titleKey: 'modelPlaza.title',
+      descriptionKey: 'modelPlaza.description',
+      seoIndexable: true
     }
   },
 
@@ -192,7 +199,9 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Global subscription prices',
-      titleKey: 'officialPrices.title'
+      titleKey: 'officialPrices.title',
+      descriptionKey: 'officialPrices.description',
+      seoIndexable: true
     }
   },
 
@@ -980,6 +989,15 @@ router.beforeEach(async (to, _from, next) => {
  * Navigation guard: End loading and trigger prefetch
  */
 router.afterEach((to) => {
+  const appStore = useAppStore()
+  const authStore = useAuthStore()
+  const adminSettingsStore = useAdminSettingsStore()
+  const customMenuItems = [
+    ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+    ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+  ]
+  applyRouteSEO(to, appStore.siteName, appStore.siteLogo, customMenuItems)
+
   // 结束导航加载状态
   navigationLoading.endNavigation()
 

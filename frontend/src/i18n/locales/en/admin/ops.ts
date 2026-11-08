@@ -143,10 +143,28 @@ export default {
       // Health Score & Diagnosis
       health: 'Health',
       healthCondition: 'Health Condition',
-      healthHelp: 'Overall system health score based on SLA, error rate, and resource usage',
+      healthHelp: 'Overall system health score based on SLA, error rate, TTFT, and resource usage',
       healthyStatus: 'Healthy',
       riskyStatus: 'At Risk',
       idleStatus: 'Idle',
+      filters: {
+        platform: 'Platform',
+        group: 'Group',
+        timeRange: 'Time range'
+      },
+      sampleInfo: 'Sample size: {count} requests',
+      sampleSize: 'Samples',
+      lowSampleWarning: 'Small sample; percentile values are indicative only',
+      severity: {
+        warning: 'Warning',
+        critical: 'Critical'
+      },
+      primaryRisk: {
+        title: 'Primary risk',
+        ttft: 'TTFT P99 is {value}, above {threshold}',
+        duration: 'Request duration P99 is {value}; responses are slow',
+        viewDetails: 'View slow requests'
+      },
       timeRange: {
         '5m': 'Last 5 minutes',
         '30m': 'Last 30 minutes',

@@ -143,10 +143,28 @@ export default {
       // Health Score & Diagnosis
       health: '健康',
       healthCondition: '健康状况',
-      healthHelp: '基于 SLA、错误率和资源使用情况的系统整体健康评分',
+      healthHelp: '基于 SLA、错误率、TTFT 和资源使用情况的系统整体健康评分',
       healthyStatus: '健康',
       riskyStatus: '风险',
       idleStatus: '待机',
+      filters: {
+        platform: '平台',
+        group: '分组',
+        timeRange: '时间范围'
+      },
+      sampleInfo: '统计样本：{count} 个请求',
+      sampleSize: '样本数',
+      lowSampleWarning: '样本量较少，百分位数据仅供参考',
+      severity: {
+        warning: '关注',
+        critical: '严重'
+      },
+      primaryRisk: {
+        title: '主要风险',
+        ttft: 'TTFT P99 {value}，已超过 {threshold}',
+        duration: '请求耗时 P99 {value}，响应明显偏慢',
+        viewDetails: '查看慢请求'
+      },
       timeRange: {
         '5m': '近5分钟',
         '30m': '近30分钟',

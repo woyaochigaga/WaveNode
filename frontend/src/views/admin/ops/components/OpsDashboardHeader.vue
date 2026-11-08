@@ -421,6 +421,64 @@ const ttftP50Ms = computed(() => overview.value?.ttft?.p50_ms ?? null)
 const ttftAvgMs = computed(() => overview.value?.ttft?.avg_ms ?? null)
 const ttftMaxMs = computed(() => overview.value?.ttft?.max_ms ?? null)
 
+const sampleCount = computed(() => overview.value?.request_count_total ?? 0)
+const hasLowSample = computed(() => sampleCount.value > 0 && sampleCount.value < 30)
+
+// 用用户更容易判断的秒/毫秒展示延迟，同时保留原始数值用于阈值判断。
+function formatLatencyValue(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-'
+  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)}s`
+  return `${Math.round(value)}ms`
+}
+
+const durationP99Label = computed(() => formatLatencyValue(durationP99Ms.value))
+const ttftP99Label = computed(() => formatLatencyValue(ttftP99Ms.value))
+
+type LatencyLevel = 'normal' | 'warning' | 'critical'
+
+function getLatencyLevel(value: number | null): LatencyLevel {
+  if (value == null) return 'normal'
+  if (value >= 10000) return 'critical'
+  if (value >= 3000) return 'warning'
+  return 'normal'
+}
+
+function getLatencyLevelClass(level: LatencyLevel): string {
+  if (level === 'critical') return 'text-red-600 dark:text-red-400'
+  if (level === 'warning') return 'text-yellow-600 dark:text-yellow-400'
+  return 'text-gray-900 dark:text-white'
+}
+
+const primaryRisk = computed(() => {
+  const ttftThreshold = props.thresholds?.ttft_p99_ms_max ?? 3000
+  if (ttftP99Ms.value != null && ttftP99Ms.value >= ttftThreshold) {
+    return {
+      kind: 'ttft' as const,
+      message: t('admin.ops.primaryRisk.ttft', {
+        value: ttftP99Label.value,
+        threshold: formatLatencyValue(ttftThreshold)
+      })
+    }
+  }
+
+  const durationLevel = getLatencyLevel(durationP99Ms.value)
+  if (durationLevel !== 'normal') {
+    return {
+      kind: 'duration' as const,
+      message: t('admin.ops.primaryRisk.duration', { value: durationP99Label.value })
+    }
+  }
+
+  return null
+})
+
+const primaryRiskPreset = computed<OpsRequestDetailsPreset>(() => {
+  if (primaryRisk.value?.kind === 'ttft') {
+    return { title: t('admin.ops.ttftLabel'), kind: 'success', sort: 'ttft_desc' }
+  }
+  return { title: t('admin.ops.latencyDuration'), kind: 'all', sort: 'duration_desc' }
+})
+
 // --- Health Score & Diagnosis (primary) ---
 
 const isSystemIdle = computed(() => {
@@ -895,28 +953,40 @@ function handleToolbarRefresh() {
 
       <div class="flex flex-wrap items-center gap-3">
         <template v-if="!props.fullscreen">
-          <Select
-            :model-value="platform"
-            :options="platformOptions"
-            class="w-full sm:w-[140px]"
-            @update:model-value="handlePlatformChange"
-          />
+          <div class="w-full sm:w-[140px]">
+            <label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">{{ t('admin.ops.filters.platform') }}</label>
+            <Select
+              :model-value="platform"
+              :options="platformOptions"
+              :aria-label="t('admin.ops.filters.platform')"
+              class="w-full"
+              @update:model-value="handlePlatformChange"
+            />
+          </div>
 
-          <Select
-            :model-value="groupId"
-            :options="groupOptions"
-            class="w-full sm:w-[160px]"
-            @update:model-value="handleGroupChange"
-          />
+          <div class="w-full sm:w-[160px]">
+            <label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">{{ t('admin.ops.filters.group') }}</label>
+            <Select
+              :model-value="groupId"
+              :options="groupOptions"
+              :aria-label="t('admin.ops.filters.group')"
+              class="w-full"
+              @update:model-value="handleGroupChange"
+            />
+          </div>
 
           <div class="mx-1 hidden h-4 w-[1px] bg-gray-200 dark:bg-dark-700 sm:block"></div>
 
-          <Select
-            :model-value="timeRange"
-            :options="timeRangeOptions"
-            class="relative w-full sm:w-[150px]"
-            @update:model-value="handleTimeRangeChange"
-          />
+          <div class="w-full sm:w-[150px]">
+            <label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">{{ t('admin.ops.filters.timeRange') }}</label>
+            <Select
+              :model-value="timeRange"
+              :options="timeRangeOptions"
+              :aria-label="t('admin.ops.filters.timeRange')"
+              class="relative w-full"
+              @update:model-value="handleTimeRangeChange"
+            />
+          </div>
         </template>
 
         <Select
@@ -989,6 +1059,33 @@ function handleToolbarRefresh() {
           </svg>
         </button>
       </div>
+    </div>
+
+    <!-- 将最重要的风险放在指标卡片之前，避免健康分与 SLA 同时正常时产生误解。 -->
+    <div
+      v-if="overview && primaryRisk"
+      class="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-900/15 sm:flex-row sm:items-center sm:justify-between"
+      role="status"
+    >
+      <div class="flex min-w-0 items-start gap-3">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m0 3h.008M10.29 3.86l-7.2 12.48A1.5 1.5 0 004.39 18.6h15.22a1.5 1.5 0 001.3-2.26l-7.2-12.48a1.5 1.5 0 00-2.6 0z" />
+        </svg>
+        <div class="min-w-0">
+          <div class="text-sm font-bold text-red-800 dark:text-red-200">{{ t('admin.ops.primaryRisk.title') }}：{{ primaryRisk.message }}</div>
+          <div class="mt-1 text-xs text-red-700/80 dark:text-red-300/80">
+            {{ t('admin.ops.sampleInfo', { count: formatNumber(sampleCount) }) }}
+            <span v-if="hasLowSample"> · {{ t('admin.ops.lowSampleWarning') }}</span>
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="shrink-0 self-start rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-dark-900 sm:self-auto"
+        @click="openDetails(primaryRiskPreset)"
+      >
+        {{ t('admin.ops.primaryRisk.viewDetails') }}
+      </button>
     </div>
 
     <div v-if="overview" class="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -1097,6 +1194,9 @@ function handleToolbarRefresh() {
                       ? t('admin.ops.healthyStatus')
                       : t('admin.ops.riskyStatus')
                 }}
+              </div>
+              <div v-if="primaryRisk" class="mt-2 max-w-[170px] text-center text-[11px] leading-4 text-red-600 dark:text-red-400">
+                {{ primaryRisk.message }}
               </div>
             </div>
           </div>
@@ -1241,6 +1341,10 @@ function handleToolbarRefresh() {
               <span class="text-gray-500">{{ t('admin.ops.avgTps') }}:</span>
               <span class="font-bold text-gray-900 dark:text-white">{{ tpsAvgLabel }}</span>
             </div>
+            <div class="flex justify-between border-t border-gray-200/70 pt-2 dark:border-dark-700">
+              <span class="text-gray-500">{{ t('admin.ops.sampleSize') }}:</span>
+              <span class="font-bold text-gray-900 dark:text-white">{{ formatNumber(sampleCount) }}</span>
+            </div>
           </div>
         </div>
 
@@ -1292,10 +1396,13 @@ function handleToolbarRefresh() {
             </button>
           </div>
           <div class="mt-2 flex items-baseline gap-2">
-            <div class="text-3xl font-black text-gray-900 dark:text-white">
-              {{ durationP99Ms ?? '-' }}
+            <div class="text-3xl font-black" :class="getLatencyLevelClass(getLatencyLevel(durationP99Ms))">
+              {{ durationP99Label }}
             </div>
-            <span class="text-xs font-bold text-gray-400">ms (P99)</span>
+            <span class="text-xs font-bold text-gray-400">(P99)</span>
+            <span v-if="getLatencyLevel(durationP99Ms) !== 'normal'" class="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+              {{ getLatencyLevel(durationP99Ms) === 'critical' ? t('admin.ops.severity.critical') : t('admin.ops.severity.warning') }}
+            </span>
           </div>
           <div class="mt-3 grid grid-cols-1 gap-x-3 gap-y-1 text-xs 2xl:grid-cols-2">
             <div class="flex items-baseline gap-1 whitespace-nowrap">
@@ -1344,9 +1451,12 @@ function handleToolbarRefresh() {
           </div>
           <div class="mt-2 flex items-baseline gap-2">
             <div class="text-3xl font-black" :class="getThresholdColorClass(getTTFTThresholdLevel(ttftP99Ms))">
-              {{ ttftP99Ms ?? '-' }}
+              {{ ttftP99Label }}
             </div>
-            <span class="text-xs font-bold text-gray-400">ms (P99)</span>
+            <span class="text-xs font-bold text-gray-400">(P99)</span>
+            <span v-if="getTTFTThresholdLevel(ttftP99Ms) !== 'normal'" class="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+              {{ getTTFTThresholdLevel(ttftP99Ms) === 'critical' ? t('admin.ops.severity.critical') : t('admin.ops.severity.warning') }}
+            </span>
           </div>
           <div class="mt-3 grid grid-cols-1 gap-x-3 gap-y-1 text-xs 2xl:grid-cols-2">
             <div class="flex items-baseline gap-1 whitespace-nowrap">
