@@ -8,6 +8,8 @@ export default {
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
     docs: '文档',
+    guides: '接入指南',
+    selectLanguage: '选择语言',
     switchToLight: '切换到浅色模式',
     switchToDark: '切换到深色模式',
     dashboard: '控制台',
@@ -17,6 +19,8 @@ export default {
     // 新增：面向用户的价值主张
     heroSubtitle: '一个密钥，畅用多个 AI 模型',
     heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
+    seoTitle: 'AI API 中转与模型接入',
+    seoDescription: 'WaveNode AI API 中转站：使用一个 API Key 接入 Claude、GPT、Gemini 等模型。查看 OpenAI 兼容接口接入教程、模型列表与用量管理。',
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',

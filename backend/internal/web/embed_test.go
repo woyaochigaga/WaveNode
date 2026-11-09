@@ -23,7 +23,45 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
+func TestRouteHTML(t *testing.T) {
+	template := []byte(`<head><title>WaveNode - AI API 中转与模型接入</title><meta name="description" content="首页描述" /><meta name="robots" content="index,follow" /><link rel="canonical" href="https://api.wavenode.org/home" /><meta property="og:url" content="https://api.wavenode.org/home" /><script id="wavenode-seo-jsonld" type="application/ld+json">{"url":"/home"}</script></head><body><div id="app"><main><h1>WaveNode 首页</h1></main></div></body>`)
+
+	assert.Equal(t, string(template), string(routeHTML(template, "/home")))
+	private := string(routeHTML(template, "/dashboard"))
+	assert.Contains(t, private, `name="robots" content="noindex,nofollow"`)
+	assert.Contains(t, private, `href="https://api.wavenode.org/dashboard"`)
+	assert.NotContains(t, private, "WaveNode 首页")
+	assert.NotContains(t, private, "wavenode-seo-jsonld")
+
+	public := string(routeHTML(template, "/model-plaza"))
+	assert.Contains(t, public, `name="robots" content="index,follow"`)
+	assert.Contains(t, public, `href="https://api.wavenode.org/model-plaza"`)
+	assert.Contains(t, public, `<title>模型广场 - WaveNode</title>`)
+	assert.NotContains(t, public, "WaveNode 首页")
+}
+
+func TestGuideAssets(t *testing.T) {
+	server, err := NewFrontendServer(&mockSettingsProvider{settings: map[string]string{"test": "value"}})
+	require.NoError(t, err)
+	router := gin.New()
+	router.Use(server.Middleware())
+
+	for _, path := range []string{"/robots.txt", "/sitemap.xml", "/guides/", "/guides/openai-compatible-api/", "/guides/api-error-429/"} {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+			assert.Equal(t, http.StatusOK, response.Code)
+			assert.NotContains(t, response.Body.String(), `id="app"`)
+		})
+	}
+}
+
 func TestInjectSiteTitle(t *testing.T) {
+	t.Run("keeps_optimized_wavenode_title", func(t *testing.T) {
+		html := []byte(`<title>AI API 中转与模型接入 - WaveNode</title>`)
+		assert.Equal(t, string(html), string(injectSiteTitle(html, []byte(`{"site_name":"WaveNode"}`))))
+	})
+
 	t.Run("replaces_title_with_site_name", func(t *testing.T) {
 		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)
 		settingsJSON := []byte(`{"site_name":"MyCustomSite"}`)

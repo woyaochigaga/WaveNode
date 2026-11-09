@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="WaveNode OpenAI 兼容 API 接入教程：获取 API Key、查询可用模型，并使用 curl 调用聊天补全接口。" />
+    <link rel="canonical" href="https://api.wavenode.org/guides/openai-compatible-api/" />
+    <link rel="stylesheet" href="/guides/guide.css" />
+    <title>OpenAI 兼容 API 接入教程 | WaveNode</title>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"OpenAI 兼容 API 接入教程","description":"获取密钥、查询模型并发起第一条聊天补全请求。","url":"https://api.wavenode.org/guides/openai-compatible-api/","publisher":{"@type":"Organization","name":"WaveNode"}}</script>
+  </head>
+  <body>
+    <header><a class="brand" href="/home">WaveNode</a><nav aria-label="主导航"><a href="/guides/">全部指南</a><a href="/register">注册</a></nav></header>
+    <main>
+      <p class="breadcrumb"><a href="/guides/">开发者指南</a> / OpenAI 兼容 API</p>
+      <h1>用 OpenAI 兼容接口发起第一条请求</h1>
+      <p class="intro">如果你的工具支持自定义 OpenAI 兼容 API 地址，可以先用下面的请求验证密钥和模型。不同工具对接口格式的支持可能不同，请先确认工具的实际配置要求。</p>
+      <h2>1. 创建并保管密钥</h2>
+      <p><a href="/register">注册或登录 WaveNode</a>，进入<a href="/keys">密钥管理</a>创建 API Key。不要把密钥放在公开仓库、截图或前端浏览器代码中。</p>
+      <h2>2. 查看可用模型</h2>
+      <p>用密钥查询当前账号可访问的模型列表；选择返回列表中的模型 ID，而不是照搬文章中的固定型号。</p>
+      <pre><code>curl https://api.wavenode.org/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <h2>3. 发起聊天补全请求</h2>
+      <p>把 <code>YOUR_MODEL_ID</code> 换成上一步返回的模型 ID。HTTP 状态码和响应正文会帮助定位权限、模型或余额问题。</p>
+      <pre><code>curl https://api.wavenode.org/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"YOUR_MODEL_ID","messages":[{"role":"user","content":"你好"}]}'</code></pre>
+      <p class="note">在支持自定义 OpenAI 兼容 Base URL 的客户端中，基础地址填写 <code>https://api.wavenode.org/v1</code>；若客户端要求完整接口地址，则按其文档填写具体路径。不要在不支持第三方地址的工具中强行替换。</p>
+      <h2>下一步</h2>
+      <p>如果遇到 HTTP 429，阅读<a href="/guides/api-error-429/">限流与额度排查指南</a>；模型的可用状态以<a href="/model-plaza">模型广场</a>及实际接口响应为准。</p>
+    </main>
+    <footer><a href="/guides/">返回全部指南</a></footer>
+  </body>
+</html>

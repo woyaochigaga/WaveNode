@@ -8,6 +8,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2 sm:gap-3">
+        <a href="/guides/" class="inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium text-gray-500 hover:text-primary-700 dark:text-dark-400 dark:hover:text-primary-300">{{ t('home.guides') }}</a>
         <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="inline-flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-primary-300">
           <Icon name="book" size="sm" />
           {{ t('home.docs') }}

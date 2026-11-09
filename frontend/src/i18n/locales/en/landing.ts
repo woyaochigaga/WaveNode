@@ -8,6 +8,8 @@ export default {
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
     docs: 'Docs',
+    guides: 'Integration guides',
+    selectLanguage: 'Select language',
     switchToLight: 'Switch to Light Mode',
     switchToDark: 'Switch to Dark Mode',
     dashboard: 'Dashboard',
@@ -17,6 +19,8 @@ export default {
     // User-focused value proposition
     heroSubtitle: 'One Key, All AI Models',
     heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
+    seoTitle: 'AI API Gateway and Model Access',
+    seoDescription: 'Use one WaveNode API key to access Claude, GPT, Gemini, and other available models. Read our OpenAI-compatible API integration guides.',
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',

@@ -37,8 +37,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Home',
-      titleKey: 'home.heroSubtitle',
-      descriptionKey: 'home.heroDescription',
+      titleKey: 'home.seoTitle',
+      descriptionKey: 'home.seoDescription',
       seoIndexable: true
     }
   },

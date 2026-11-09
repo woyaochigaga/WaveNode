@@ -33,7 +33,9 @@ function setCanonical(url: string): void {
 
 function safeLogoUrl(siteLogo?: string): string {
   const value = siteLogo?.trim()
-  return value && (value.startsWith('/') || /^https?:\/\//i.test(value)) ? value : `${window.location.origin}/logo.svg`
+  return value && ((value.startsWith('/') && !value.startsWith('//')) || /^https?:\/\//i.test(value))
+    ? new URL(value, window.location.origin).toString()
+    : `${window.location.origin}/logo.svg`
 }
 
 function setJsonLd(payload: Record<string, unknown>): void {
@@ -78,7 +80,7 @@ export function applyRouteSEO(
   const logo = safeLogoUrl(siteLogo)
 
   document.title = title
-  document.documentElement.lang = i18n.global.locale.value === 'zh' ? 'zh-CN' : 'en'
+  document.documentElement.lang = i18n.global.locale.value === 'zh' ? 'zh-CN' : i18n.global.locale.value
   setMeta('name', 'description', description)
   setMeta('name', 'robots', indexable ? 'index,follow' : 'noindex,nofollow')
   setMeta('name', 'googlebot', indexable ? 'index,follow' : 'noindex,nofollow')
@@ -93,12 +95,16 @@ export function applyRouteSEO(
   setMeta('name', 'twitter:description', description)
   setMeta('name', 'twitter:image', logo)
   setCanonical(canonical)
-  setJsonLd({
-    '@context': 'https://schema.org',
-    '@type': indexable && route.name !== 'Home' ? 'WebPage' : 'WebSite',
-    name: title,
-    url: canonical,
-    description,
-    publisher: { '@type': 'Organization', name: normalizedSiteName, logo: { '@type': 'ImageObject', url: logo } },
-  })
+  if (indexable) {
+    setJsonLd({
+      '@context': 'https://schema.org',
+      '@type': route.name === 'Home' ? 'WebSite' : 'WebPage',
+      name: title,
+      url: route.name === 'Home' ? window.location.origin + '/' : canonical,
+      description,
+      publisher: { '@type': 'Organization', name: normalizedSiteName, logo: { '@type': 'ImageObject', url: logo } },
+    })
+  } else {
+    document.head.querySelector('#wavenode-seo-jsonld')?.remove()
+  }
 }

@@ -82,6 +82,7 @@
     <footer class="min-w-0 border-t border-gray-200 px-4 py-4 text-sm text-gray-500 dark:border-dark-800 dark:text-dark-400 sm:px-6">
       <div class="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
         <span>&copy; {{ currentYear }} {{ siteName }}</span>
+        <a href="/guides/" class="text-primary-600 hover:underline">{{ t('home.guides') }}</a>
         <LocaleSwitcher placement="top" />
       </div>
     </footer>

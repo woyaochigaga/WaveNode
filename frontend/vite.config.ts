@@ -29,7 +29,7 @@ function isSafeImageUrl(value: string): boolean {
 function injectBranding(html: string, config: { site_name?: string; site_logo?: string }): string {
   let brandedHtml = html
   const siteName = config.site_name?.trim()
-  if (siteName) {
+  if (siteName && siteName !== 'WaveNode') {
     brandedHtml = brandedHtml.replace(
       /<title>[^<]*<\/title>/i,
       `<title>${escapeHtml(siteName)} - AI API Gateway</title>`,
@@ -114,6 +114,10 @@ export default defineConfig(({ mode }) => {
          */
         manualChunks(id: string) {
           if (id.includes('node_modules')) {
+            // 简繁转换字典仅在用户切换到繁体中文时下载。
+            if (id.includes('/opencc-js/')) {
+              return 'locale-opencc'
+            }
             // Vue 核心库
             if (
               id.includes('/vue/') ||

@@ -1,6 +1,8 @@
 <template>
   <div class="relative" ref="dropdownRef">
     <button
+      type="button"
+      :aria-label="t('home.selectLanguage')"
       @click="toggleDropdown"
       :disabled="switching"
       class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
@@ -19,10 +21,11 @@
     <transition name="dropdown">
       <div
         v-if="isOpen"
-        class="absolute right-0 z-50 w-32 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
+        class="absolute right-0 z-50 w-36 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
         :class="props.placement === 'top' ? 'bottom-full mb-1' : 'mt-1'"
       >
         <button
+          type="button"
           v-for="locale in availableLocales"
           :key="locale.code"
           :disabled="switching"
@@ -54,7 +57,7 @@ const props = withDefaults(defineProps<{
   placement: 'bottom'
 })
 
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)

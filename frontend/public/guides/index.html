@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="WaveNode 开发者指南：从 API Key、模型列表到 OpenAI 兼容接口调用，以及 HTTP 429 错误的排查步骤。" />
+    <link rel="canonical" href="https://api.wavenode.org/guides/" />
+    <link rel="stylesheet" href="/guides/guide.css" />
+    <title>开发者接入指南 | WaveNode</title>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":"WaveNode 开发者接入指南","url":"https://api.wavenode.org/guides/","description":"API Key、模型列表、OpenAI 兼容接口与错误排查指南。","publisher":{"@type":"Organization","name":"WaveNode"}}</script>
+  </head>
+  <body>
+    <header><a class="brand" href="/home">WaveNode</a><nav aria-label="主导航"><a href="/model-plaza">模型广场</a><a href="/register">注册</a></nav></header>
+    <main>
+      <h1>从第一把 API Key 开始</h1>
+      <p class="intro">按实际调用顺序了解 WaveNode：创建密钥、查看可用模型、发起 OpenAI 兼容请求。遇到限流问题时，再根据响应信息定位原因。</p>
+      <a class="start-link" href="/guides/openai-compatible-api/">阅读 API 接入教程 →</a>
+      <section class="article-list" aria-label="教程列表">
+        <article><h2><a href="/guides/openai-compatible-api/">如何接入 OpenAI 兼容 API</a></h2><p>从创建密钥到验证 <code>/v1/models</code> 和 <code>/v1/chat/completions</code>，附可替换的请求示例。</p></article>
+        <article><h2><a href="/guides/api-error-429/">API 返回 429，应该检查什么？</a></h2><p>区分速率限制与额度问题，检查模型、密钥、并发和重试策略。</p></article>
+      </section>
+    </main>
+    <footer><a href="/home">返回 WaveNode 首页</a></footer>
+  </body>
+</html>

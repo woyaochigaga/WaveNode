@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { applyRouteSEO } from '@/router/seo'
+import { i18n } from '@/i18n'
 
 vi.mock('@/i18n', () => ({
   i18n: {
     global: {
       locale: { value: 'zh' },
       t: (key: string) => ({
-        'home.heroSubtitle': '一个密钥，畅用多个 AI 模型',
-        'home.heroDescription': '一站式接入主流 AI 服务',
+        'home.seoTitle': 'AI API 中转与模型接入',
+        'home.seoDescription': '一个 API Key 接入主流 AI 服务',
         'modelPlaza.description': '按分组浏览可用模型与价格',
       }[key] ?? key),
     },
@@ -23,7 +24,7 @@ function route(overrides: Partial<RouteLocationNormalizedLoaded> = {}): RouteLoc
     params: {},
     query: {},
     hash: '',
-    meta: { requiresAuth: false, seoIndexable: true, titleKey: 'home.heroSubtitle', descriptionKey: 'home.heroDescription' },
+    meta: { requiresAuth: false, seoIndexable: true, titleKey: 'home.seoTitle', descriptionKey: 'home.seoDescription' },
     matched: [],
     redirectedFrom: undefined,
     ...overrides,
@@ -40,9 +41,9 @@ describe('applyRouteSEO', () => {
   it('为公开页面写入可索引元信息和 canonical', () => {
     applyRouteSEO(route(), 'WaveNode')
 
-    expect(document.title).toBe('一个密钥，畅用多个 AI 模型 - WaveNode')
+    expect(document.title).toBe('AI API 中转与模型接入 - WaveNode')
     expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('index,follow')
-    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe('一站式接入主流 AI 服务')
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe('一个 API Key 接入主流 AI 服务')
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(`${window.location.origin}/home`)
     expect(document.querySelector('#wavenode-seo-jsonld')?.textContent).toContain('WebSite')
   })
@@ -53,5 +54,13 @@ describe('applyRouteSEO', () => {
     expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex,nofollow')
     expect(document.querySelector('meta[name="googlebot"]')?.getAttribute('content')).toBe('noindex,nofollow')
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(`${window.location.origin}/dashboard`)
+    expect(document.querySelector('#wavenode-seo-jsonld')).toBeNull()
+  })
+
+  it('繁体中文使用对应的页面语言代码', () => {
+    i18n.global.locale.value = 'zh-TW'
+    applyRouteSEO(route(), 'WaveNode')
+    expect(document.documentElement.lang).toBe('zh-TW')
+    i18n.global.locale.value = 'zh'
   })
 })
