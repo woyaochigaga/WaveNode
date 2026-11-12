@@ -35,7 +35,7 @@ function safeLogoUrl(siteLogo?: string): string {
   const value = siteLogo?.trim()
   return value && ((value.startsWith('/') && !value.startsWith('//')) || /^https?:\/\//i.test(value))
     ? new URL(value, window.location.origin).toString()
-    : `${window.location.origin}/logo.svg`
+    : `${window.location.origin}/wave-logo.svg`
 }
 
 function setJsonLd(payload: Record<string, unknown>): void {

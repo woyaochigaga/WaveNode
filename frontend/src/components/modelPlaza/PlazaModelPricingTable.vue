@@ -1,5 +1,5 @@
 <template>
-  <div class="plaza-pricing-table overflow-x-auto" :style="accentStyle">
+  <div class="plaza-pricing-table overflow-x-auto" :style="accentStyle" role="region" :aria-label="t('modelPlaza.table.details')" tabindex="0">
     <table class="w-full min-w-[1000px] table-auto border-collapse text-sm tabular-nums">
       <colgroup>
         <col class="w-[25%]" />
@@ -13,11 +13,11 @@
       </colgroup>
       <thead>
         <tr
-          class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400"
+          class="text-xs font-semibold text-gray-500 dark:text-dark-400"
         >
           <th
             rowspan="2"
-            class="border-r border-gray-100 py-2.5 pl-5 pr-4 text-left align-middle dark:border-dark-700/60"
+            class="sticky left-0 z-20 border-r border-gray-100 bg-white py-2.5 pl-5 pr-4 text-left align-middle dark:border-dark-700/60 dark:bg-dark-800"
           >
             {{ t('modelPlaza.table.model') }}
           </th>
@@ -44,26 +44,26 @@
           </th>
         </tr>
         <tr
-          class="border-b border-gray-200 text-left text-[11px] font-medium uppercase leading-4 tracking-wide text-gray-400 dark:border-dark-700 dark:text-dark-500"
+          class="border-b border-gray-200 text-left text-xs font-medium leading-4 text-gray-400 dark:border-dark-700 dark:text-dark-500"
         >
-          <th class="pz-bg px-3 py-2 font-medium">{{ t('modelPlaza.table.input') }}</th>
-          <th class="pz-bg px-3 py-2 font-medium">{{ t('modelPlaza.table.output') }}</th>
-          <th class="pz-bg px-3 py-2 font-medium">{{ t('modelPlaza.table.cache') }}</th>
-          <th class="border-l border-gray-100 px-3 py-2 font-medium dark:border-dark-700/60">
+          <th class="pz-bg px-3 py-2 text-right font-medium">{{ t('modelPlaza.table.input') }}</th>
+          <th class="pz-bg px-3 py-2 text-right font-medium">{{ t('modelPlaza.table.output') }}</th>
+          <th class="pz-bg px-3 py-2 text-right font-medium">{{ t('modelPlaza.table.cache') }}</th>
+          <th class="border-l border-gray-100 px-3 py-2 text-right font-medium dark:border-dark-700/60">
             {{ t('modelPlaza.table.input') }}
           </th>
-          <th class="px-3 py-2 font-medium">{{ t('modelPlaza.table.output') }}</th>
-          <th class="px-3 py-2 font-medium">{{ t('modelPlaza.table.cache') }}</th>
+          <th class="px-3 py-2 text-right font-medium">{{ t('modelPlaza.table.output') }}</th>
+          <th class="px-3 py-2 text-right font-medium">{{ t('modelPlaza.table.cache') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr
           v-for="{ model: m, period, key } in rows"
           :key="key"
-          class="border-b border-gray-100 transition-colors last:border-b-0 hover:bg-gray-50/70 dark:border-dark-800 dark:hover:bg-dark-800/50"
+          class="group border-b border-gray-100 transition-colors last:border-b-0 hover:bg-gray-50/70 dark:border-dark-800 dark:hover:bg-dark-800/50"
         >
           <!-- 模型名 + 非 token 计费模式徽章;分时时段行额外标注时段 -->
-          <td class="border-r border-gray-100 py-2.5 pl-5 pr-4 align-middle dark:border-dark-700/60">
+          <td class="sticky left-0 z-10 border-r border-gray-100 bg-white py-2.5 pl-5 pr-4 align-middle group-hover:bg-gray-50 dark:border-dark-700/60 dark:bg-dark-800 dark:group-hover:bg-dark-800">
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="font-medium text-gray-900 dark:text-white">{{ m.name }}</span>
               <!-- 时段徽章紧跟模型名,其余徽章排在后面,空间不足时先换行的是它们 -->
@@ -113,7 +113,7 @@
 
           <!-- token 计费:输入 / 输出 / 缓存(写/读),有阶梯时每档一行;档位标签只放输入列,其余列按行对齐 -->
           <template v-if="billingMode(m) === BILLING_MODE_TOKEN">
-            <td class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
+            <td class="pz-cell px-3 py-2.5 text-right align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
               <template v-if="tokenIntervals(m).length">
                 <div
                   v-for="(iv, idx) in tokenIntervals(m)"
@@ -126,7 +126,7 @@
               </template>
               <template v-else>{{ paidPerMillion(m.pricing?.input_price, period) }}</template>
             </td>
-            <td class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
+            <td class="pz-cell px-3 py-2.5 text-right align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
               <template v-if="tokenIntervals(m).length">
                 <div
                   v-for="(iv, idx) in tokenIntervals(m)"
@@ -139,7 +139,7 @@
               </template>
               <template v-else>{{ paidPerMillion(m.pricing?.output_price, period) }}</template>
             </td>
-            <td class="pz-cell px-3 py-2.5 align-middle">
+            <td class="pz-cell px-3 py-2.5 text-right align-middle">
               <template v-if="hasTierCachePricing(tokenIntervals(m))">
                 <div
                   v-for="(iv, idx) in tokenIntervals(m)"
@@ -210,7 +210,7 @@
 
           <!-- 官方价格(参考价,不乘倍率;官方有阶梯时每档一行) -->
           <td
-            class="border-l border-gray-100 px-3 py-2.5 align-middle font-mono text-xs text-gray-500 dark:border-dark-700/60 dark:text-dark-400"
+            class="border-l border-gray-100 px-3 py-2.5 text-right align-middle font-mono text-xs text-gray-500 dark:border-dark-700/60 dark:text-dark-400"
           >
             <template v-if="officialIntervals(m).length">
               <div
@@ -224,7 +224,7 @@
             </template>
             <template v-else>{{ official(m.official_pricing?.input_price) }}</template>
           </td>
-          <td class="px-3 py-2.5 align-middle font-mono text-xs text-gray-500 dark:text-dark-400">
+          <td class="px-3 py-2.5 text-right align-middle font-mono text-xs text-gray-500 dark:text-dark-400">
             <template v-if="officialIntervals(m).length">
               <div
                 v-for="(iv, idx) in officialIntervals(m)"
@@ -237,7 +237,7 @@
             </template>
             <template v-else>{{ official(m.official_pricing?.output_price) }}</template>
           </td>
-          <td class="px-3 py-2.5 align-middle">
+          <td class="px-3 py-2.5 text-right align-middle">
             <template v-if="hasTierCachePricing(officialIntervals(m))">
               <div
                 v-for="(iv, idx) in officialIntervals(m)"

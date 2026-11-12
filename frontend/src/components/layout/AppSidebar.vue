@@ -9,29 +9,27 @@
   >
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
+      <!-- Logo 和品牌名作为紧凑 Home 入口，避免整块矩形链接覆盖品牌区。 -->
       <router-link
         :to="homePath"
         class="sidebar-home-link"
         :aria-label="siteName"
         @click="handleMenuItemClick(homePath)"
-      />
-      <!-- Custom Logo or Default Logo -->
-      <div
-        class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
-      </div>
-      <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-        <span
-          class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors dark:text-white"
+        <!-- Custom Logo or Default Logo -->
+        <div
+          class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-full shadow-glow"
         >
-          {{ siteName }}
-        </span>
-        <!-- Version Badge -->
-        <div class="sidebar-version-control">
-          <VersionBadge :version="siteVersion" />
+          <img v-if="settingsLoaded" :src="siteLogo || '/wave-logo.svg'" alt="Logo" class="h-full w-full object-contain" />
         </div>
-      </div>
+        <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+          <span
+            class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors dark:text-white"
+          >
+            {{ siteName }}
+          </span>
+        </div>
+      </router-link>
     </div>
 
     <!-- Navigation -->
@@ -224,7 +222,6 @@ import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'v
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
-import VersionBadge from '@/components/common/VersionBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
@@ -289,18 +286,16 @@ const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
-const homePath = '/home'
-
 // Per-group expand/collapse overrides. A group with no entry follows the
 // automatic behavior (expanded while the active route is one of its children);
 // a chevron click records the user's choice, which wins over the automatic
 // state so an active group can still be collapsed manually.
 const groupExpandOverrides = ref<Map<string, boolean>>(new Map())
+const homePath = '/home'
 
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const siteVersion = computed(() => appStore.siteVersion)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
 // SVG Icon Components
@@ -1012,25 +1007,34 @@ onBeforeUnmount(() => {
 <style scoped>
 .sidebar-header {
   position: relative;
+  margin: 0.5rem 0.625rem 0.625rem;
+  height: 3.5rem;
+  border: 1px solid rgb(148 163 184 / 0.12);
+  border-radius: 1rem;
+  background: rgb(15 23 42 / 0.42);
 }
 
 .sidebar-home-link {
-  position: absolute;
-  inset: 0.25rem;
-  z-index: 0;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.75rem;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
   border-radius: 0.75rem;
-  transition:
-    background-color 0.18s ease,
-    box-shadow 0.18s ease;
+  transition: opacity 0.18s ease;
 }
 
 .sidebar-home-link:hover {
-  background: rgb(20 184 166 / 0.06);
+  opacity: 0.9;
 }
 
 .sidebar-home-link:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgb(20 184 166 / 0.55);
+  outline: 2px solid rgb(45 212 191 / 0.7);
+  outline-offset: -2px;
 }
 
 .sidebar-logo {
@@ -1043,8 +1047,15 @@ onBeforeUnmount(() => {
 
 .sidebar-header-collapsed {
   gap: 0;
-  padding-left: 1.125rem;
-  padding-right: 1.125rem;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  padding-left: 0.625rem;
+  padding-right: 0.625rem;
+}
+
+.sidebar-header-collapsed .sidebar-home-link {
+  flex: 0 0 auto;
+  gap: 0;
 }
 
 .sidebar-brand {
@@ -1059,11 +1070,6 @@ onBeforeUnmount(() => {
     opacity 0.14s ease,
     transform 0.14s ease;
   max-width: 12rem;
-}
-
-.sidebar-version-control {
-  width: fit-content;
-  pointer-events: auto;
 }
 
 .sidebar-brand-collapsed {

@@ -52,10 +52,12 @@ describe('AppSidebar collapsible groups', () => {
 })
 
 describe('AppSidebar header styles', () => {
-  it('uses the complete brand area as a home link', () => {
-    expect(componentSource).toContain("const homePath = '/home'")
+  it('keeps a compact home link without restoring the version badge', () => {
     expect(componentSource).toContain('class="sidebar-home-link"')
     expect(componentSource).toContain(':to="homePath"')
+    expect(componentSource).toContain('@click="handleMenuItemClick(homePath)"')
+    expect(componentSource).not.toContain('VersionBadge')
+    expect(componentSource).not.toContain('sidebar-version-control')
   })
 
   it('does not clip the version badge dropdown', () => {

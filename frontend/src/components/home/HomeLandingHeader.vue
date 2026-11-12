@@ -5,7 +5,7 @@
       :class="{ 'is-scrolled': isScrolled }"
     >
       <div class="flex min-w-0 flex-1 items-center gap-3">
-        <img :src="siteLogo || '/logo.svg'" :alt="siteName" class="landing-logo h-10 w-10 shrink-0 rounded-xl object-contain" />
+        <img :src="siteLogo || '/wave-logo.svg'" :alt="siteName" class="landing-logo h-10 w-10 shrink-0 object-contain" />
         <span class="max-w-[42vw] truncate text-sm font-semibold tracking-tight text-gray-900 dark:text-white sm:text-base">{{ siteName }}</span>
       </div>
 

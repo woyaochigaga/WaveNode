@@ -20,7 +20,7 @@
     <header class="border-b border-gray-200 px-4 py-4 sm:px-6 dark:border-dark-800">
       <nav class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div class="flex min-w-0 flex-1 items-center gap-3">
-          <img :src="siteLogo || '/logo.svg'" :alt="siteName" class="h-9 w-9 shrink-0 rounded-lg object-contain" />
+          <img :src="siteLogo || '/wave-logo.svg'" :alt="siteName" class="h-9 w-9 shrink-0 object-contain" />
           <span class="min-w-0 truncate text-base font-semibold">{{ siteName }}</span>
         </div>
         <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
@@ -64,7 +64,7 @@
 
     <main class="flex min-w-0 flex-1 items-center justify-center px-4 py-16 sm:px-6">
       <div class="min-w-0 max-w-2xl text-center">
-        <img :src="siteLogo || '/logo.svg'" :alt="siteName" class="mx-auto mb-6 h-20 w-20 rounded-2xl object-contain" />
+        <img :src="siteLogo || '/wave-logo.svg'" :alt="siteName" class="mx-auto mb-6 h-20 w-20 object-contain" />
         <h1 class="break-words text-3xl font-bold md:text-4xl">{{ siteName }}</h1>
         <p class="mt-4 whitespace-pre-wrap break-words text-base text-gray-600 dark:text-dark-300">
           {{ siteSubtitle }}
